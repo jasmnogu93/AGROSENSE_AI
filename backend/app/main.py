@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.config import settings
 from app.models import (
     PlantProfile,
     Sector,
@@ -156,7 +157,9 @@ async def health_check():
     """
     Probe de salud para Azure Container Instances (ACI).
     """
-    return HealthStatus()
+    return HealthStatus(
+        environment=settings.ENVIRONMENT
+    )
 
 @app.post("/api/v1/telemetry", response_model=Dict[str, Any])
 async def ingest_telemetry(telemetry: TelemetryInput):

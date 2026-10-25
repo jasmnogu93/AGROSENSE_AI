@@ -94,5 +94,6 @@ class HealthStatus(BaseModel):
     status: str = "healthy"
     service: str = "AgroSense AI Cloud Backend"
     version: str = "1.0.0"
+    environment: str = "development"
     engine_jev: str = "ONLINE"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
