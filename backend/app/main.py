@@ -136,6 +136,7 @@ async def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevD
     Si no hay API key o hay fallo de red, conmuta transparentemente al motor de reglas local.
     """
     api_key = settings.LLM_API_KEY.strip()
+    api_error_notice = None
     if api_key and api_key != "tu_api_key_aqui" and not api_key.startswith("dev_local_key"):
         try:
             url = settings.JEV_DECISIONS_API_URL
@@ -217,11 +218,17 @@ async def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevD
                         lease_duration_seconds=1200,
                         failsafe_active=False
                     )
-        except Exception:
-            # En caso de error de red, pasa transparentemente al motor local
-            pass
+                else:
+                    api_error_notice = f"❌ [Error al acceder a TypeSafe Jev - HTTP {res.status_code}]: "
+        except Exception as e:
+            api_error_notice = f"❌ [Error al acceder a TypeSafe Jev ({type(e).__name__})]: "
+    else:
+        api_error_notice = "⚠️ [Aviso: API Key no detectada para TypeSafe Jev]: "
 
-    return evaluate_jev_local(telemetry, profile)
+    fallback_response = evaluate_jev_local(telemetry, profile)
+    if api_error_notice:
+        fallback_response.justification_reason = f"{api_error_notice}{fallback_response.justification_reason}"
+    return fallback_response
 
 # Decisión inicial (usando motor local en el arranque para no bloquear)
 latest_jev_decision = evaluate_jev_local(latest_telemetry, current_plant_profile)
@@ -365,6 +372,8 @@ INSTRUCCIONES:
 
     # 1. Intentar invocar a la API de DeepSeek / OpenAI si hay Key real configurada
     api_key = settings.LLM_API_KEY.strip()
+    api_error_notice = None
+
     if api_key and api_key != "tu_api_key_aqui" and not api_key.startswith("dev_local_key"):
         try:
             url = f"{settings.LLM_BASE_URL.rstrip('/')}/chat/completions"
@@ -392,9 +401,12 @@ INSTRUCCIONES:
                         answer=ai_answer,
                         tools_consulted=tools_used + [f"DeepSeek ({settings.LLM_MODEL_NAME})"]
                     )
-        except Exception:
-            # Si hay timeout o error de red, pasa al fallback local transparente
-            pass
+                else:
+                    api_error_notice = f"❌ [Error al acceder al modelo {settings.LLM_MODEL_NAME} - HTTP {res.status_code}]: Verifique que su API Key sea válida y tenga saldo o use un modelo gratuito como 'deepseek/deepseek-chat:free'.\n\n[Respuesta del Asistente Local]:\n"
+        except Exception as e:
+            api_error_notice = f"❌ [Error al acceder al modelo de IA ({type(e).__name__})]: No se pudo conectar con el endpoint. Modo de contingencia local activado.\n\n[Respuesta del Asistente Local]:\n"
+    else:
+        api_error_notice = "⚠️ [Aviso: API Key no detectada]: No se detectó una API Key activa en tu archivo '.env'. Configura LLM_API_KEY en backend/.env (por ejemplo tu clave gratuita de OpenRouter).\n\n[Respuesta del Asistente Local]:\n"
 
     # 2. Modo Fallback Local (Respuestas contextualizadas sin depender de saldo/red)
     q = request.question.lower()
@@ -438,6 +450,8 @@ INSTRUCCIONES:
             f"¿Deseas consultar sobre riego, fertilización o riesgo de heladas?"
         )
 
+    if api_error_notice:
+        answer = f"{api_error_notice}{answer}"
     return FarmChatResponse(
         answer=answer,
         tools_consulted=tools_used + ["Motor Local Heurístico"]
