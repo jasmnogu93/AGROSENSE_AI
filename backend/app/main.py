@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from typing import Dict, Any, List
+import httpx
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -224,11 +225,82 @@ async def simulate_scenario(scenario: str):
 async def chat_with_farm(request: FarmChatRequest):
     """
     Función 'Habla con tu Granja':
-    El LLM contextualiza las preguntas del agricultor usando las métricas reales
-    de la base de datos y la justificación del motor JEV.
+    Invoca al LLM (DeepSeek / OpenAI compatible) inyectando en el System Prompt
+    la telemetría real del campo, el perfil botánico investigado y la justificación de JEV.
+    Si no hay API key configurada o falla la red, conmuta a modo local sin caerse.
     """
-    q = request.question.lower()
     tools_used = ["TelemetryReading", "PlantProfile", "JevDecisionLog"]
+
+    # Preparar el contexto agronómico completo para DeepSeek / LLM
+    system_prompt = f"""Eres el Asistente Agronómico Inteligente de la plataforma 'AgroSense AI'.
+Tu labor es responder a las consultas del agricultor con tono profesional, empático, claro y fundamentado en los datos reales del campo.
+
+CONTEXTO AGRONÓMICO DEL SECTOR:
+- Cuartel: {current_sector.name} ({current_sector.soil_type}, {current_sector.area_hectares} ha)
+- Especie: {current_plant_profile.common_name} (Variedad: {current_plant_profile.variety})
+- Etapa fenológica: {current_sector.growth_stage}
+- Requisitos botánicos ideales:
+  * Humedad de suelo óptima: {current_plant_profile.optimal_moisture_min}% a {current_plant_profile.optimal_moisture_max}%
+  * pH de suelo óptimo: {current_plant_profile.optimal_ph_min} a {current_plant_profile.optimal_ph_max}
+  * Umbral crítico de helada: {current_plant_profile.frost_critical_temp} °C
+  * Límite de viento: {current_plant_profile.max_wind_tolerance_kmh} km/h
+  * Proporción NPK recomendada: {current_plant_profile.ideal_npk_ratio}
+  * Plagas/hongos comunes: {', '.join(current_plant_profile.common_diseases)}
+  * Notas agronómicas: {current_plant_profile.research_notes}
+
+MEDICIONES ACTUALES DE SENSORES EN TERRENO:
+- Humedad de suelo: {latest_telemetry.soil_moisture}%
+- Temperatura ambiente: {latest_telemetry.ambient_temperature} °C
+- Temperatura de raíz: {latest_telemetry.soil_temperature} °C
+- Humedad ambiental: {latest_telemetry.ambient_humidity}%
+- Nivel de pH: {latest_telemetry.ph_level}
+- Nutrientes NPK: Nitrógeno {latest_telemetry.nitrogen_ppm} ppm, Fósforo {latest_telemetry.phosphorus_ppm} ppm, Potasio {latest_telemetry.potassium_ppm} ppm
+- Viento: {latest_telemetry.wind_speed_kmh} km/h
+
+ESTADO DEL MOTOR DE CONTROL EN TIEMPO REAL (JEV):
+- Estado de activación: {'ACTIVO' if latest_jev_decision.decision_action else 'EN REPOSO'}
+- Modulación de potencia: {latest_jev_decision.decision_intensity}%
+- Herramientas en marcha: {', '.join(latest_jev_decision.commanded_tools) if latest_jev_decision.commanded_tools else 'Ninguna'}
+- Justificación determinista de JEV: {latest_jev_decision.justification_reason}
+
+INSTRUCCIONES:
+1. Responde directamente a la consulta del usuario.
+2. Explica el por qué de las decisiones del sistema basándote en los números medidos.
+3. Sé conciso y utiliza recomendaciones agronómicas aplicables al trabajo de campo."""
+
+    # 1. Intentar invocar a la API de DeepSeek / OpenAI si hay Key real configurada
+    api_key = settings.LLM_API_KEY.strip()
+    if api_key and api_key != "tu_api_key_aqui" and not api_key.startswith("dev_local_key"):
+        try:
+            url = f"{settings.LLM_BASE_URL.rstrip('/')}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": settings.LLM_MODEL_NAME,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": request.question}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 400
+            }
+            async with httpx.AsyncClient(timeout=25.0) as client:
+                res = await client.post(url, json=payload, headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    ai_answer = data["choices"][0]["message"]["content"]
+                    return FarmChatResponse(
+                        answer=ai_answer,
+                        tools_consulted=tools_used + [f"DeepSeek ({settings.LLM_MODEL_NAME})"]
+                    )
+        except Exception:
+            # Si hay timeout o error de red, pasa al fallback local transparente
+            pass
+
+    # 2. Modo Fallback Local (Respuestas contextualizadas sin depender de saldo/red)
+    q = request.question.lower()
 
     if "riego" in q or "regar" in q or "bomba" in q:
         if latest_jev_decision.decision_action:
@@ -251,7 +323,7 @@ async def chat_with_farm(request: FarmChatRequest):
     elif "planta" in q or "cultivo" in q or "avellano" in q:
         answer = (
             f"El cuartel activo tiene cultivado '{current_plant_profile.common_name}' (Variedad: {current_plant_profile.variety}). "
-            f"Parámetros investigados por el LLM: Humedad óptima entre {current_plant_profile.optimal_moisture_min}% y {current_plant_profile.optimal_moisture_max}%, "
+            f"Parámetros investigados: Humedad óptima entre {current_plant_profile.optimal_moisture_min}% y {current_plant_profile.optimal_moisture_max}%, "
             f"pH entre {current_plant_profile.optimal_ph_min} y {current_plant_profile.optimal_ph_max}. "
             f"Consejo agronómico: {current_plant_profile.research_notes}"
         )
@@ -259,17 +331,17 @@ async def chat_with_farm(request: FarmChatRequest):
         answer = (
             f"El pH de tu suelo está en {latest_telemetry.ph_level} (Rango ideal: {current_plant_profile.optimal_ph_min} - {current_plant_profile.optimal_ph_max}). "
             f"Nivel de macronutrientes: Nitrógeno: {latest_telemetry.nitrogen_ppm} ppm, Fósforo: {latest_telemetry.phosphorus_ppm} ppm, "
-            f"Potasio: {latest_telemetry.potassium_ppm} ppm. Proporción NPK sugerida por el catálogo botánico: {current_plant_profile.ideal_npk_ratio}."
+            f"Potasio: {latest_telemetry.potassium_ppm} ppm. Proporción NPK sugerida: {current_plant_profile.ideal_npk_ratio}."
         )
     else:
         answer = (
-            f"Hola, soy el asistente botánico de AgroSense AI. Tu granja en el sector '{current_sector.name}' "
+            f"Hola, soy el asistente botánico de AgroSense AI. Tu granja en '{current_sector.name}' "
             f"reporta humedad de {latest_telemetry.soil_moisture}%, temperatura de {latest_telemetry.ambient_temperature}°C "
-            f"y viento de {latest_telemetry.wind_speed_kmh} km/h. El motor JEV indica: '{latest_jev_decision.justification_reason}'. "
-            f"¿Deseas consultar sobre riego, nutrición de suelo o riesgo de heladas?"
+            f"y viento de {latest_telemetry.wind_speed_kmh} km/h. Decisión de JEV: '{latest_jev_decision.justification_reason}'. "
+            f"¿Deseas consultar sobre riego, fertilización o riesgo de heladas?"
         )
 
     return FarmChatResponse(
         answer=answer,
-        tools_consulted=tools_used
+        tools_consulted=tools_used + ["Motor Local Heurístico"]
     )

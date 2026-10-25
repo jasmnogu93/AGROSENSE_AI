@@ -14,9 +14,10 @@ class Settings:
     PORT: int = int(os.getenv("PORT", "8000"))
     HOST: str = os.getenv("HOST", "0.0.0.0")
     
-    # Proveedor LLM
+    # Proveedor LLM (DeepSeek / OpenAI compatible)
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
     LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "deepseek-chat")
+    LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
     AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
     
     # Token de seguridad para dispositivos en terreno
