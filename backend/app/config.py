@@ -20,6 +20,10 @@ class Settings:
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
     AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
     
+    # Motor de Decisiones IA: TypeSafe Jev (jevai.net)
+    JEV_MODEL_NAME: str = os.getenv("JEV_MODEL_NAME", "typesafe/jev-latest")
+    JEV_DECISIONS_API_URL: str = os.getenv("JEV_DECISIONS_API_URL", "https://openrouter.ai/api/alpha/decisions")
+    
     # Token de seguridad para dispositivos en terreno
     JEV_DEVICE_AUTH_TOKEN: str = os.getenv("JEV_DEVICE_AUTH_TOKEN", "default_secret_token")
     

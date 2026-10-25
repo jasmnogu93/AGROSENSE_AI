@@ -265,8 +265,8 @@ erDiagram
 
 ---
 
-### 3.6 Entidad `JevDecisionLog` (Auditoría del Motor de Control en Tiempo Real)
-* **Propósito:** Registro estricto y auditable de cada intervención de **JEV**. Elimina la sensación de "caja negra" al guardar el *por qué* matemático de cada encendido o apagado.
+### 3.6 Entidad `JevDecisionLog` (Auditoría de la IA TypeSafe Jev - jevai.net)
+* **Propósito:** Registro estricto y auditable de cada inferencia emitida por la IA de decisiones **TypeSafe Jev (`jevai.net`)**. Almacena la resolución de sus 3 primitivas nativas: **Noul** (`decision_action`), **Score** (`decision_intensity`) y **Choice** (`actuator_id`), garantizando total explicabilidad de por qué se encendió o detuvo una maquinaria.
 
 | Atributo | Tipo de Dato | Llave | Nulo | Descripción y Uso Práctico |
 | :--- | :--- | :--- | :--- | :--- |

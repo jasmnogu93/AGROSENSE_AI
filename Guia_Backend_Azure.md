@@ -12,10 +12,11 @@
 
 Se desarrolló el **Microservicio Cloud Central de AgroSense AI**:
 1. **API Asíncrona con FastAPI**: Ingesta de datos de sensores IoT, validación estricta con esquemas Pydantic v2 y endpoints de monitoreo de salud.
-2. **Motor Determinista JEV en la Nube**: Algoritmo de control en tiempo real que evalúa matrices físicas (humedad de suelo, temperatura ambiental, viento) y produce las 3 salidas requeridas:
-   * **Booleano de activación** (`true/false`).
-   * **Modulación de potencia** (`0 - 100%`).
-   * **Despacho de actuadores** (`bomba_riego_principal`, `electrovalvula_cuartel_01`, `calefactor_antihelada`).
+2. **IA de Toma de Decisiones TypeSafe Jev (`jevai.net`)**: Integración nativa con el modelo de decisiones System One de TypeSafe AI (`typesafe/jev-latest` en OpenRouter). Evalúa el estado de la granja y responde con sus 3 primitivas nativas:
+   * **Noul** ("Sí o No" / Booleano de autorización de riego).
+   * **Score** ("0 a 100" / Modulación de potencia porcentual).
+   * **Choice** ("Herramientas de la lista" / Selección de actuador o electrobomba).
+   * Incluye modo de contingencia local (*fallback*) para no detenerse si se corta internet.
 3. **Función "Habla con tu Granja"**: Asistente agronómico conversacional que responde dudas del agricultor consultando en tiempo real las métricas de la base de datos y la justificación de JEV.
 4. **Dashboard Web Integrado**: Panel visual responsivo y moderno (HTML5 + Tailwind CSS) que permite a cualquier evaluador ver los datos en vivo, simular eventos climáticos extremos y hablar con la granja.
 5. **Contenedor Docker Portable**: `Dockerfile` multietapa optimizado para correr idénticamente en local y en Microsoft Azure.

@@ -72,15 +72,13 @@ latest_telemetry = TelemetryInput(
 )
 
 # ==============================================================================
-# MOTOR DE INFERENCIA DETERMINISTA JEV (Control en Tiempo Real)
+# MOTOR DE INFERENCIA IA: TYPESAFE JEV (jevai.net) & FALLBACK LOCAL
 # ==============================================================================
-def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisionResponse:
+
+def evaluate_jev_local(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisionResponse:
     """
-    Evalúa la matriz multidimensional de seguridad y comando de maquinaria.
-    Produce 3 variables estrictas:
-    1. Booleano (true/false)
-    2. Modulación de intensidad (0 - 100%)
-    3. Selección de herramientas comandadas
+    Motor Heurístico Local de Respaldo (Fallback sin conexión):
+    Calcula deterministamente las 3 variables de control si la API de Jev no está disponible.
     """
     # 1. Regla de Máxima Prioridad: Protección de Heladas
     if telemetry.ambient_temperature <= profile.frost_critical_temp:
@@ -88,7 +86,7 @@ def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisio
             decision_action=False,
             decision_intensity=0,
             commanded_tools=["calefactor_antihelada_sec1"],
-            justification_reason=f"BLOQUEO POR HELADA: Temp ambiente ({telemetry.ambient_temperature}°C) <= umbral crítico ({profile.frost_critical_temp}°C). Riego cancelado para evitar congelación foliar y radicular.",
+            justification_reason=f"BLOQUEO POR HELADA (Modo Local): Temp ambiente ({telemetry.ambient_temperature}°C) <= umbral crítico ({profile.frost_critical_temp}°C). Riego cancelado para evitar congelación foliar y radicular.",
             lease_duration_seconds=1800,
             failsafe_active=True
         )
@@ -99,7 +97,7 @@ def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisio
             decision_action=False,
             decision_intensity=0,
             commanded_tools=["alerta_viento_alto"],
-            justification_reason=f"SUSPENSIÓN POR VIENTO: Ráfagas de {telemetry.wind_speed_kmh} km/h superan el límite de {profile.max_wind_tolerance_kmh} km/h. Drones y aspersores detenidos.",
+            justification_reason=f"SUSPENSIÓN POR VIENTO (Modo Local): Ráfagas de {telemetry.wind_speed_kmh} km/h superan el límite de {profile.max_wind_tolerance_kmh} km/h. Drones y aspersores detenidos.",
             lease_duration_seconds=900,
             failsafe_active=False
         )
@@ -107,13 +105,12 @@ def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisio
     # 3. Regla de Riego: Humedad deficiente
     if telemetry.soil_moisture < profile.optimal_moisture_min:
         deficit = profile.optimal_moisture_min - telemetry.soil_moisture
-        # Calcular potencia modulada (entre 60% y 95%) según el déficit
         power = min(95, int(60 + (deficit * 2.5)))
         return JevDecisionResponse(
             decision_action=True,
             decision_intensity=power,
             commanded_tools=["bomba_riego_principal", "electrovalvula_cuartel_01"],
-            justification_reason=f"RIEGO ACTIVADO: Humedad de suelo ({telemetry.soil_moisture}%) inferior al umbral mínimo del cultivo ({profile.optimal_moisture_min}%). Déficit hídrico de {deficit:.1f}%.",
+            justification_reason=f"RIEGO ACTIVADO (Modo Local): Humedad de suelo ({telemetry.soil_moisture}%) inferior al umbral mínimo del cultivo ({profile.optimal_moisture_min}%). Déficit hídrico de {deficit:.1f}%.",
             lease_duration_seconds=1200,
             failsafe_active=False
         )
@@ -123,13 +120,111 @@ def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisio
         decision_action=False,
         decision_intensity=0,
         commanded_tools=[],
-        justification_reason=f"CONDICIÓN ÓPTIMA: Humedad ({telemetry.soil_moisture}%) dentro del rango ideal ({profile.optimal_moisture_min}% - {profile.optimal_moisture_max}%). Riego en reposo para cuidar el agua.",
+        justification_reason=f"CONDICIÓN ÓPTIMA (Modo Local): Humedad ({telemetry.soil_moisture}%) dentro del rango ideal ({profile.optimal_moisture_min}% - {profile.optimal_moisture_max}%). Riego en reposo para cuidar el agua.",
         lease_duration_seconds=1800,
         failsafe_active=False
     )
 
-# Decisión inicial
-latest_jev_decision = evaluate_jev(latest_telemetry, current_plant_profile)
+async def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisionResponse:
+    """
+    Invoca a la IA de Toma de Decisiones TypeSafe Jev (jevai.net) vía OpenRouter Decisions API.
+    Envía el estado de la granja (telemetría + perfil de cultivo) y formula las 3 preguntas nativas:
+    1. Noul: "¿Se debe activar la maquinaria?" -> Booleano 'Sí o No'
+    2. Score: "¿Cuál es el nivel de modulación requerido (0-100%)?" -> Intensidad '0 - 100'
+    3. Choice: "¿Qué actuador o herramienta específica debe despacharse?" -> 'Herramientas de la lista'
+    
+    Si no hay API key o hay fallo de red, conmuta transparentemente al motor de reglas local.
+    """
+    api_key = settings.LLM_API_KEY.strip()
+    if api_key and api_key != "tu_api_key_aqui" and not api_key.startswith("dev_local_key"):
+        try:
+            url = settings.JEV_DECISIONS_API_URL
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://agrosense.ai",
+                "X-Title": "AgroSense AI - TypeSafe Jev Decisions"
+            }
+            state = {
+                "sector": current_sector.name,
+                "crop": f"{profile.common_name} ({profile.variety})",
+                "soil_moisture_pct": telemetry.soil_moisture,
+                "optimal_moisture_min": profile.optimal_moisture_min,
+                "optimal_moisture_max": profile.optimal_moisture_max,
+                "ambient_temperature_c": telemetry.ambient_temperature,
+                "frost_critical_temp_c": profile.frost_critical_temp,
+                "wind_speed_kmh": telemetry.wind_speed_kmh or 0.0,
+                "max_wind_tolerance_kmh": profile.max_wind_tolerance_kmh,
+                "ph_level": telemetry.ph_level or 6.5
+            }
+            questions = {
+                "activate_action": {
+                    "type": "noul",
+                    "instructions": "¿Se debe activar alguna acción de riego o protección física inmediata para el cultivo?"
+                },
+                "modulation_intensity": {
+                    "type": "score",
+                    "instructions": "Nivel de potencia o modulación de intensidad requerida de 0 a 100 por ciento.",
+                    "levels": ["0", "20", "40", "60", "80", "100"]
+                },
+                "dispatched_tool": {
+                    "type": "choice",
+                    "instructions": "¿Cuál de las herramientas registradas en la flota debe entrar en operación?",
+                    "options": [
+                        "ninguna",
+                        "bomba_riego_principal",
+                        "calefactor_antihelada_sec1",
+                        "electrovalvula_cuartel_01",
+                        "dron_fumigador_alfa"
+                    ]
+                }
+            }
+            payload = {
+                "model": settings.JEV_MODEL_NAME,
+                "state": state,
+                "questions": questions
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(url, json=payload, headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    decisions = data.get("decisions", {})
+                    
+                    # 1. Noul: Sí o No
+                    noul_obj = decisions.get("activate_action", {})
+                    if "value" in noul_obj and isinstance(noul_obj["value"], bool):
+                        is_active = noul_obj["value"]
+                    else:
+                        is_active = float(noul_obj.get("score", noul_obj.get("probability", 0))) > 0.5
+                    
+                    # 2. Score: 0 a 100
+                    score_obj = decisions.get("modulation_intensity", {})
+                    score_val = score_obj.get("value", "0")
+                    try:
+                        intensity = int(score_val)
+                    except Exception:
+                        intensity = int(float(score_obj.get("score", 0)) * 100) if is_active else 0
+                    
+                    # 3. Choice: Herramientas de la lista
+                    choice_val = decisions.get("dispatched_tool", {}).get("value", "ninguna")
+                    tools = [choice_val] if choice_val and choice_val != "ninguna" else []
+                    
+                    return JevDecisionResponse(
+                        decision_action=is_active,
+                        decision_intensity=intensity if is_active else 0,
+                        commanded_tools=tools,
+                        justification_reason=f"Decisión IA emitida por TypeSafe Jev ({settings.JEV_MODEL_NAME}): Noul={is_active}, Score={intensity}%, Choice={choice_val}",
+                        lease_duration_seconds=1200,
+                        failsafe_active=False
+                    )
+        except Exception:
+            # En caso de error de red, pasa transparentemente al motor local
+            pass
+
+    return evaluate_jev_local(telemetry, profile)
+
+# Decisión inicial (usando motor local en el arranque para no bloquear)
+latest_jev_decision = evaluate_jev_local(latest_telemetry, current_plant_profile)
 
 
 # ==============================================================================
@@ -170,7 +265,7 @@ async def ingest_telemetry(telemetry: TelemetryInput):
     """
     global latest_telemetry, latest_jev_decision
     latest_telemetry = telemetry
-    latest_jev_decision = evaluate_jev(latest_telemetry, current_plant_profile)
+    latest_jev_decision = await evaluate_jev(latest_telemetry, current_plant_profile)
     return {
         "status": "success",
         "message": "Telemetría recibida y evaluada por JEV",
@@ -214,7 +309,7 @@ async def simulate_scenario(scenario: str):
     else:
         raise HTTPException(status_code=400, detail="Escenario no reconocido. Use: sequia, helada, optimo, viento")
 
-    latest_jev_decision = evaluate_jev(latest_telemetry, current_plant_profile)
+    latest_jev_decision = await evaluate_jev(latest_telemetry, current_plant_profile)
     return {
         "scenario": scenario,
         "telemetry": latest_telemetry,

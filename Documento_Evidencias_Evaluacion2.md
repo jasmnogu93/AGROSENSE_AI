@@ -15,7 +15,7 @@
 
 ## 1. Introducción y Objetivo de la Actividad
 
-El presente informe documenta el proceso completo de contenedorización y despliegue en la nube de una aplicación web y API REST funcional desarrollada en **Python (FastAPI)**. La aplicación seleccionada corresponde al núcleo del backend de **AgroSense AI**, un ecosistema inteligente para la agricultura de precisión que integra telemetría IoT, el motor determinista de toma de decisiones **JEV** y un asistente agronómico conversacional ("Habla con tu Granja").
+El presente informe documenta el proceso completo de contenedorización y despliegue en la nube de una aplicación web y API REST funcional desarrollada en **Python (FastAPI)**. La aplicación seleccionada corresponde al núcleo del backend de **AgroSense AI**, un ecosistema inteligente para la agricultura de precisión que integra telemetría IoT, la IA de toma de decisiones **TypeSafe Jev (`jevai.net`)** (utilizando sus 3 primitivas nativas: *Noul* para Sí/No, *Score* para 0-100 y *Choice* para selección de herramientas) y un asistente agronómico conversacional ("Habla con tu Granja").
 
 ### Objetivos Alcanzados:
 1. Preparar y estructurar el proyecto funcional en Python FastAPI.

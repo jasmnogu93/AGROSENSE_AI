@@ -55,18 +55,22 @@ flowchart TD
 
 ---
 
-## 3. IA 1: JEV (Justification & Execution Vector — Motor de Control en Tiempo Real)
+## 3. IA 1: TypeSafe Jev (jevai.net — Modelo de Decisiones System One)
+
+> [!IMPORTANT]
+> **Definición Oficial de JEV en el Proyecto:**  
+> Cuando en este proyecto y en la documentación técnica se menciona **JEV**, nos referimos explícitamente a **TypeSafe Jev (`jevai.net`)**, la inteligencia artificial de decisiones desarrollada por TypeSafe AI (fundada por ex-investigadores de OpenAI). No es un generador de texto ni un simple script: es un modelo discriminativo *"System 1"* de alta velocidad optimizado para inferencia máquina a máquina vía API (`typesafe/jev-latest` en OpenRouter).
 
 ### 3.1 Propósito y Filosofía
-JEV **no es un generador de texto** ni un chatbot. Es un motor de inferencia y orquestación de políticas de control que opera en la nube a través de API. 
+JEV **no genera texto libre** ni es un chatbot. Es un motor de inferencia y orquestación de políticas de control que opera en la nube a través de la API de Decisiones. 
 
-A diferencia de la programación tradicional basada en `if / else` rígidos, JEV es capaz de procesar múltiples variables de entrada simultáneas (humedad de suelo, índice térmico, velocidad de viento, nivel de carga de baterías, presión en tuberías) y resolver compromisos dinámicos en tiempo real sin caer en código "espagueti".
+A diferencia de la programación tradicional basada en `if / else` rígidos, JEV procesa el estado completo de la granja (humedad, temperatura, pH, viento, batería) y resuelve compromisos multidimensionales en tiempo real evaluando preguntas tipadas en una sola pasada paralela de alta velocidad (70 a 200 ms).
 
-### 3.2 Formato Estricto de Salida (3 Tipos de Variables)
-JEV comanda los actuadores mediante una estructura de salida estandarizada:
-1. **Boleano de Activación (`true / false`)**: Determina inequívocamente si una maniobra está autorizada o debe interrumpirse de emergencia.
-2. **Modulación de Intensidad (`0 a 100%`)**: Señal proporcional que define la potencia de la electrobomba, el grado de apertura de una electroválvula proporcional, la velocidad de avance de un tractor o la dosificación de aspersión.
-3. **Despacho de Herramientas (Tool Calling / Actuadores)**: Selección de la maquinaria o actuador específico dentro del catálogo de la granja (`bomba_sector_norte`, `valvula_secundaria_3`, `dron_fumigador_alfa`, `tractor_arado_sur`).
+### 3.2 Las 3 Primitivas Nativas de Decisión de JEV
+TypeSafe Jev estructura sus decisiones en torno a 3 tipos de preguntas fundamentales:
+1. **Noul ("Sí o No" / Booleano con Probabilidad)**: Determina inequívocamente si una maniobra física (ej: activación de bomba de riego o protocolo de helada) está autorizada o debe bloquearse (`true / false`).
+2. **Score ("0 a 100" / Modulación Continua Ponderada)**: Evalúa el estado sobre una escala ordenada (niveles del 0% al 100%) para definir la potencia de la electrobomba, el grado de apertura de una electroválvula o la velocidad de un actuador.
+3. **Choice ("Decisiones de la Lista de Herramientas")**: Selecciona la herramienta específica dentro del catálogo de la flota (`ninguna`, `bomba_riego_principal`, `calefactor_antihelada_sec1`, `electrovalvula_cuartel_01`, `dron_fumigador_alfa`).
 
 ### 3.3 Escalabilidad Futura de la Flota
 Cuando la granja incorpore nuevos equipos (drones, brazos robóticos o sensores de savia), **no se requiere reprogramar el código de los microcontroladores en terreno**. La nueva maquinaria simplemente se registra en el catálogo de herramientas de FastAPI, y JEV aprende a orquestarla dentro de su lógica global en la nube.
