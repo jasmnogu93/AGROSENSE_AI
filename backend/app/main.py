@@ -4,6 +4,7 @@ import math
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 import httpx
+from pydantic import BaseModel, Field
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -374,6 +375,11 @@ async def send_actuator_command(cmd: ActuatorCommand):
     }
 
 
+class ScheduleUpdateRequest(BaseModel):
+    interval_hours: int = Field(..., ge=1, le=24, description="Frecuencia en horas entre ciclos")
+    duration_minutes: int = Field(..., ge=1, le=120, description="Duración de bombeo en minutos")
+
+
 @app.get("/api/v1/schedule", response_model=Dict[str, Any])
 async def get_schedule():
     """Endpoint de calendario de recirculación (Requerimiento Semana 13 Integración II)."""
@@ -386,6 +392,39 @@ async def get_schedule():
         "next_cycle": next_cycle.strftime("%Y-%m-%d %H:%M:%S"),
         "pump_status": "ACTIVA" if latest_telemetry.pump_active else "EN_ESPERA",
         "notification_message": f"Próximo ciclo programado a las {next_cycle.strftime('%H:%M:%S')} ({current_plant_profile.recirculation_cycle_minutes} min)"
+    }
+
+
+@app.post("/api/v1/schedule", response_model=Dict[str, Any])
+async def update_schedule(data: ScheduleUpdateRequest):
+    """
+    Actualiza la configuración del calendario de riego/recirculación:
+    Modifica la frecuencia (horas) y duración (minutos) en memoria y en la base de datos SQLite.
+    """
+    global current_plant_profile
+    current_plant_profile.recirculation_interval_hours = data.interval_hours
+    current_plant_profile.recirculation_cycle_minutes = data.duration_minutes
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE perfiles_cultivo 
+            SET intervalo_riego_horas = ?, recirculacion_minutos = ?
+            WHERE id = 1
+        """, (data.interval_hours, data.duration_minutes))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error actualizando horario en SQLite: {e}")
+
+    next_cycle = datetime.now() + timedelta(hours=data.interval_hours)
+    return {
+        "status": "success",
+        "message": f"Calendario actualizado: cada {data.interval_hours}h por {data.duration_minutes} min.",
+        "interval_hours": data.interval_hours,
+        "duration_minutes": data.duration_minutes,
+        "next_cycle_time": next_cycle.strftime("%H:%M:%S")
     }
 
 

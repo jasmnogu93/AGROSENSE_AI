@@ -225,23 +225,60 @@
         <div class="grid grid-cols-3 gap-3 mb-4 text-center">
           <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
             <span class="text-[11px] text-gray-400 block">Frecuencia</span>
-            <span class="text-lg font-bold font-mono text-white">Cada {{ schedule.interval_hours }}h</span>
+            <span id="displayInterval" class="text-lg font-bold font-mono text-white">Cada {{ schedule.interval_hours }}h</span>
           </div>
           <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
             <span class="text-[11px] text-gray-400 block">Duración</span>
-            <span class="text-lg font-bold font-mono text-emerald-400">{{ schedule.duration_minutes }} min</span>
+            <span id="displayDuration" class="text-lg font-bold font-mono text-emerald-400">{{ schedule.duration_minutes }} min</span>
           </div>
           <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
             <span class="text-[11px] text-gray-400 block">Próximo Ciclo</span>
-            <span class="text-lg font-bold font-mono text-cyan-300">{{ schedule.next_cycle_time }}</span>
+            <span id="displayNextCycle" class="text-lg font-bold font-mono text-cyan-300">{{ schedule.next_cycle_time }}</span>
           </div>
         </div>
 
-        <div class="bg-amber-950/40 border border-amber-700/50 p-3 rounded-xl flex items-center gap-3 text-xs text-amber-200">
+        <div class="bg-amber-950/40 border border-amber-700/50 p-3 rounded-xl flex items-center gap-3 text-xs text-amber-200 mb-4">
           <span class="text-xl">🔔</span>
-          <div>
+          <div class="flex-1">
             <span class="font-bold block">Notificación de Sistema:</span>
-            <span>{{ schedule.notification }}</span>
+            <span id="displayNotification">{{ schedule.notification }}</span>
+          </div>
+          <button onclick="toggleSchedulePanel()" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs transition">
+            ⚙️ Configurar
+          </button>
+        </div>
+
+        <!-- PANEL DE CONFIGURACIÓN DE FRECUENCIA Y DURACIÓN (COLAPSABLE) -->
+        <div id="scheduleConfigPanel" class="hidden bg-slate-900/95 border border-amber-500/40 p-4 rounded-xl space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-bold text-amber-400 font-mono">🛠️ Ajustar Frecuencia y Duración de Riego</span>
+            <button onclick="toggleSchedulePanel()" class="text-xs text-gray-400 hover:text-white">&times; Cerrar</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] text-gray-300 block mb-1">Frecuencia (Horas):</label>
+              <input id="inputInterval" type="number" min="1" max="24" value="{{ schedule.interval_hours }}"
+                     class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-amber-400">
+              <span class="text-[10px] text-gray-500">Ej: 1, 2 o 4 horas</span>
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-300 block mb-1">Duración (Minutos):</label>
+              <input id="inputDuration" type="number" min="1" max="120" value="{{ schedule.duration_minutes }}"
+                     class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-emerald-400 focus:outline-none focus:border-amber-400">
+              <span class="text-[10px] text-gray-500">Ej: 5, 10 o 15 min</span>
+            </div>
+          </div>
+
+          <div class="flex gap-2 pt-1">
+            <button onclick="saveSchedule()" id="saveScheduleBtn"
+                    class="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs transition">
+              💾 Guardar Nuevo Horario
+            </button>
+            <button onclick="triggerImmediatePulse()"
+                    class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition">
+              ⚡ Regar Ahora (Pulso)
+            </button>
           </div>
         </div>
       </div>
@@ -400,6 +437,53 @@
   </footer>
 
   <script>
+    function toggleSchedulePanel() {
+      const panel = document.getElementById('scheduleConfigPanel');
+      panel.classList.toggle('hidden');
+    }
+
+    async function saveSchedule() {
+      const interval = parseInt(document.getElementById('inputInterval').value, 10);
+      const duration = parseInt(document.getElementById('inputDuration').value, 10);
+
+      if (isNaN(interval) || interval < 1 || isNaN(duration) || duration < 1) {
+        alert('Por favor introduce valores numéricos válidos (horas >= 1, minutos >= 1).');
+        return;
+      }
+
+      const btn = document.getElementById('saveScheduleBtn');
+      btn.disabled = true;
+      btn.innerText = 'Guardando...';
+
+      try {
+        const res = await fetch('/api/v1/schedule', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ interval_hours: interval, duration_minutes: duration })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          document.getElementById('displayInterval').innerText = `Cada ${data.interval_hours}h`;
+          document.getElementById('displayDuration').innerText = `${data.duration_minutes} min`;
+          document.getElementById('displayNextCycle').innerText = data.next_cycle_time;
+          document.getElementById('displayNotification').innerText = `Riego reprogramado: ciclos de ${data.duration_minutes} min cada ${data.interval_hours}h.`;
+          toggleSchedulePanel();
+          alert(`✅ Configuración guardada en SQLite:\nFrecuencia: cada ${data.interval_hours} hora(s)\nDuración: ${data.duration_minutes} minutos`);
+        } else {
+          alert('Error actualizando horario: ' + JSON.stringify(data));
+        }
+      } catch (e) {
+        alert('Error al conectar con la API: ' + e);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '💾 Guardar Nuevo Horario';
+      }
+    }
+
+    async function triggerImmediatePulse() {
+      await sendCommand('bomba_agua', 'ON', 60);
+    }
+
     async function sendCommand(target, action, parameter_value) {
       try {
         const res = await fetch('/api/v1/actuators/command', {
