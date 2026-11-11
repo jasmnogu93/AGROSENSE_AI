@@ -1,7 +1,7 @@
 # PROGRESS_LOGS.md — Historial de Progreso y Trazabilidad SDD (AgroSense AI)
 
 > **Documento:** `specs/PROGRESS_LOGS.md`  
-> **Última Actualización:** 2026-11-11 19:32:00 (Chile / Temuco)  
+> **Última Actualización:** 2026-11-11 19:43:00 (Chile / Temuco)  
 > **Metodología:** Spec-Driven Development (SDD)  
 > **Líder de Registro:** `spec_lead` & `academic_compliance`
 
@@ -64,3 +64,4 @@
 | `2026-11-11 18:43` | `architect` / `spec_lead` | Actualización de `AGENTS.md` a v2.1: estrategia híbrida (Enjambre `swarm` como eje principal + `invoke_subagent` táctico) y matriz de modelos/esfuerzos (Argon y Flash). | Reglas y propiedad de carpetas listas para ejecución paralela. |
 | `2026-11-11 19:13` | `architect` / `spec_lead` | Auditoría y endurecimiento SDD: Regla 3.1 en `AGENTS.md`, SQL/Pydantic en `spec-001..003`, corrección pines PaP (`19,23,5,13`) y creación de `spec-006` (IA/Simulación), `spec-007` (ESP32) y `spec-008` (Android). | Brechas de RAM/BD y desfase `Desktop` vs `OneDrive` documentados sin tocar código. |
 | `2026-11-11 19:32` | `backend_service_dev` / `qa_verification` | Creación de `backend/app/db.py`, tablas `calendario_semanal` y `estado_modulo` en SQLite, sincronización `main.py` + `index.html`, corrección etiqueta PaP `19,23,5,13` y limpieza de deuda técnica. | `ALL_BACKEND_CHECKS_PASSED` vía FastAPI `TestClient` (persistencia, bloqueo `<20%` anti-cavitación y los 3 servicios). |
+| `2026-11-11 19:43` | `spec_lead` | Creación de `GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md` con método de 6 preguntas, botiquín de diagnóstico código→SDD y glosario sin jerga. | Sincronizado y enlazado desde `ProyectoServiciosASAI/README_PROYECTO_SERVICIOS_ASAI.md`. |

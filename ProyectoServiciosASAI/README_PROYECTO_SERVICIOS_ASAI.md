@@ -29,6 +29,7 @@ Esta suite documental define las reglas del juego antes de escribir una sola lí
 | 📘 [ARQUITECTURA_ORIENTADA_A_SERVICIOS_ASAI.md](file:///c:/Users/Jonathan/Desktop/Santo%20Tomas/Proyecto%20Feria/ProyectoServiciosASAI/ARQUITECTURA_ORIENTADA_A_SERVICIOS_ASAI.md) | Especificación técnica de los **4 servicios independientes**: límites de responsabilidad, protocolos de enlace (MQTT / REST) y cómo las IAs se integran como servicios "enchufables" sin acoplar el núcleo. |
 | 🗄️ [ESPECIFICACION_DATOS_Y_SERVICIOS_ASAI.md](file:///c:/Users/Jonathan/Desktop/Santo%20Tomas/Proyecto%20Feria/ProyectoServiciosASAI/ESPECIFICACION_DATOS_Y_SERVICIOS_ASAI.md) | Contrato de datos: modelos Pydantic simplificados para la bandeja hidropónica, jerarquía de tópicos MQTT en HiveMQ, contrato de la API REST y script SQL de persistencia. |
 | 📋 [PLAN_DE_DESARROLLO_Y_ENTREGABLES_ASAI.md](file:///c:/Users/Jonathan/Desktop/Santo%20Tomas/Proyecto%20Feria/ProyectoServiciosASAI/PLAN_DE_DESARROLLO_Y_ENTREGABLES_ASAI.md) | Matriz de cumplimiento cruzado para los 3 ramos, asignación de tareas específicas para los 3 compañeros del equipo y cronograma paso a paso. |
+| 🧭 [GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md](../GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md) | Mapa pedagógico completo (6 preguntas: Qué, Por qué, Para quién, Herramientas, Código y SDD) + botiquín de diagnóstico rápido y glosario para defensa de título. |
 
 ---
 
