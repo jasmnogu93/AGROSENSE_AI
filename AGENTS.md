@@ -121,8 +121,10 @@ Para cada nueva característica, refactorización o servicio, se debe seguir est
 ## 4. Estructura de Directorios del Proyecto
 
 ```text
-Proyecto Feria/
+AGROSENSE_AI/
 ├── AGENTS.md                               <- Este documento (Roles, Modelos y Reglas SDD)
+├── GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md      <- Mapa didáctico 6 preguntas y botiquín de diagnóstico
+├── .gitignore                              <- Exclusiones limpias (.venv, *.db, cachés)
 ├── specs/                                  <- Especificaciones SDD y Logs de Progreso
 │   ├── spec-001-architecture-overview.md   <- Arquitectura Tri-Servicio, SQL DDL y Contratos Base
 │   ├── spec-002-field-greenhouse-service.md<- Servicio Campos / Orquídeas (Integración II)
@@ -138,10 +140,13 @@ Proyecto Feria/
 │   ├── app/
 │   │   ├── routers/                        <- Routers independientes por servicio
 │   │   ├── templates/                      <- Frontend adaptativo (index.html)
+│   │   ├── db.py                           <- Capa compartida SQLite y cálculo DPV
 │   │   ├── main.py                         <- Núcleo del servidor y montaje de routers
 │   │   ├── models.py                       <- Contratos Pydantic
 │   │   └── database_schema.sql             <- Esquema SQLite / PostgreSQL
-│   └── agrosense.db                        <- Base de datos SQLite persistente
+│   ├── tests/
+│   │   └── test_api.py                     <- Suite automatizada pytest (con BD temporal aislada)
+│   └── agrosense.db                        <- Base de datos SQLite persistente (local, ignorada en Git)
 ├── Programacion Android/                   <- Aplicación nativa Android (IEI-058)
 └── firmware/                               <- Código C++ para ESP32 DevKit V1 (IEI-059)
 ```
