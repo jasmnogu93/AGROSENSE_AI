@@ -20,7 +20,9 @@ La **Mini Torre Domiciliaria Inteligente** es un electrodoméstico agrícola par
 
 ---
 
-## 2. Mapeo Físico de Hardware MVP
+## 2. Mapeo Físico de Hardware MVP (Oficial)
+
+> **Regla de Hardware:** Seguir estrictamente `INVENTARIO_HARDWARE_Y_MAPEO_PINES_MVP.md`. El Motor PaP usa **GPIO 19, 23, 5, 13** (se prohíbe GPIO 12 por ser strapping pin de voltaje flash en arranque ESP32).
 
 | Componente | Función en Mini Torre | Pin ESP32 DevKit V1 | Interfaz / Alimentación |
 | :--- | :--- | :--- | :--- |
@@ -29,15 +31,36 @@ La **Mini Torre Domiciliaria Inteligente** es un electrodoméstico agrícola par
 | **Sensor Nivel Resistivo** | Medición de agua en estanque con pulso anti-electrólisis | GPIO 34 (ADC1) / GPIO 25 (Excitación 50 ms) | 3.3V |
 | **Mini-Bomba 5V** | Recirculación de solución nutritiva por goteo/NFT | GPIO 26 | Relé optoacoplado / 5V Arduino |
 | **Servomotor SG90** | Apertura de rejilla de ventilación superior (0° - 90°) | GPIO 18 | PWM (LEDC) / 5V Arduino |
-| **Motor PaP 28BYJ-48** | Dispensador peristáltico de nutrientes A/B | GPIO 19, 13, 12, 14 | Driver ULN2003 / 5V Arduino |
+| **Motor PaP 28BYJ-48** | Dispensador peristáltico de nutrientes A/B | **GPIO 19, 23, 5, 13** | Driver ULN2003 / 5V Arduino |
 
 ---
 
 ## 3. Especificación de Endpoints REST
 
-| Método | Endpoint | Descripción | Payload Request | Respuesta (HTTP 200) |
+| Método | Endpoint | Descripción | Payload Request | Respuesta |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/services/home-tower/status` | Estado integral de la torre: nivel estanque, bomba, actuadores y DPV | Ninguno | Telemetría, seguridad de bomba, salud del sistema |
-| `POST` | `/api/v1/services/home-tower/recirculation` | Configura el intervalo y duración del ciclo de bombeo | `{ "interval_hours": 2, "duration_minutes": 15 }` | Parámetros confirmados |
-| `POST` | `/api/v1/services/home-tower/actuators/command` | Comando manual directo a actuador (Bomba, Servo, Motor PaP) | `{ "actuator": "bomba_agua", "action": "ON", "parameter_value": 60 }` | Resultado del comando y log en BD |
-| `GET` | `/api/v1/services/home-tower/safety-check` | Evaluación de reglas de protección (cavitación y alivio térmico) | Ninguno | Estado de riesgo (`NORMAL`, `WARNING`, `CRITICAL`) |
+| `GET` | `/api/v1/services/home-tower/status` | Estado integral de la torre: nivel estanque, bomba, actuadores y DPV | Ninguno | HTTP 200: telemetría, actuadores, recirculación y seguridad |
+| `POST` | `/api/v1/services/home-tower/recirculation` | Configura el intervalo y duración del ciclo de bombeo | `RecirculationUpdate` | HTTP 200: parámetros confirmados y `next_cycle_time` |
+| `POST` | `/api/v1/services/home-tower/actuators/command` | Comando manual directo a actuador (Bomba, Servo, Motor PaP) | `ActuatorCommand` | HTTP 200 (log en SQLite) o HTTP 400 (bloqueo cavitación) |
+| `GET` | `/api/v1/services/home-tower/safety-check` | Evaluación de reglas de protección (cavitación y alivio térmico) | Ninguno | HTTP 200: `NORMAL`, `WARNING`, `CRITICAL` |
+
+---
+
+## 4. Contratos JSON Exactos y Regla Anti-Cavitación
+* **`POST /api/v1/services/home-tower/recirculation` (`RecirculationUpdate`):**
+  * **Request:** `{ "interval_hours": 2, "duration_minutes": 15 }` (`interval_hours` `1..24`, `duration_minutes` `1..120`).
+* **`POST /api/v1/services/home-tower/actuators/command` (`ActuatorCommand`):**
+  * **Request:**
+    ```json
+    {
+      "target": "bomba_agua",
+      "action": "ON",
+      "parameter_value": 60,
+      "triggered_by": "ANDROID_APP"
+    }
+    ```
+  * Valores válidos:
+    * `target`: `"bomba_agua" | "servo_ventilacion" | "motor_nutrientes"`
+    * `action`: `"ON" | "OFF" | "SET_ANGLE" | "DISPENSE_STEPS"`
+  * **Bloqueo Crítico Anti-Cavitación:** Si `target == "bomba_agua"` y `action == "ON"` mientras `reservoir_level_percent < 20.0`, el backend **debe rechazar el comando con HTTP `400`** sin encender la bomba.
+* **Compatibilidad Legacy (v1 raíz) y Persistencia Unificada:** Se mantienen activos `/api/v1/telemetry`, `/api/v1/actuators/command`, `/api/v1/schedule` y `/api/v1/health` en `main.py`, compartiendo el módulo `celda-01` en SQLite (`estado_modulo` y `calendario_semanal` vía `backend/app/db.py`) para sincronización inmediata entre simulaciones, web, ESP32 y Android.

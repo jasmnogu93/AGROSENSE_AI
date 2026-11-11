@@ -1,7 +1,7 @@
 # AGENTS.md — Protocolo de Agentes y Roles del Proyecto AgroSense AI (ASAI)
 
 > **Plataforma:** AgroSense AI (ASAI) — Hub de Servicios Agrícolas y Ciberfísicos  
-> **Versión:** 2.0 (Arquitectura Tri-Servicio Orientada a Servicios - SOA / SDD)  
+> **Versión:** 2.1 (Arquitectura Tri-Servicio SOA / SDD + Orquestación Multi-Modelo)  
 > **Ámbito:** Integración de Competencias II (IEI-094), IoT (IEI-059), Programación Android (IEI-058) y Feria de Innovación Santo Tomás.
 
 ---
@@ -73,8 +73,8 @@ graph TD
 ### 2.6. `iot_firmware_engineer` — Embedded Systems & Hardware Specialist
 * **Misión:** Mantener el firmware del ESP32 DevKit V1 y la integración de sensores/actuadores físicos.
 * **Responsabilidades:**
-  * Mapeo de pines: DHT11 (GPIO 4), BME280 (I2C 21/22), Sensor de nivel (GPIO 34 con pulso en 25), Relé Bomba (GPIO 26), Servo SG90 (GPIO 18), Motor PaP (GPIO 19, 13, 12, 14).
-  * Payload JSON estandarizado hacia el backend.
+  * Mapeo de pines oficial (`INVENTARIO_HARDWARE_Y_MAPEO_PINES_MVP.md`): DHT11 (GPIO 4), BME280 (I2C 21/22), Sensor de nivel (GPIO 34 con pulso 50 ms en GPIO 25), Relé Bomba (GPIO 26), Servo SG90 (GPIO 18), Motor PaP ULN2003 (GPIO 19, 23, 5, 13).
+  * Payload JSON estandarizado hacia el backend (MQTT / HTTP REST).
   * Lógica local de fail-safe: apagado automático de bomba si el nivel cae de 20%.
 
 ### 2.7. `android_engineer` — Android Native Developer
@@ -109,19 +109,29 @@ Para cada nueva característica, refactorización o servicio, se debe seguir est
 4. **Implementar:** Ejecutar el código manteniendo la integridad de lo existente.
 5. **Verificar:** Ejecutar pruebas automáticas o llamadas HTTP reales; al tener éxito, marcar como `[COMPLETADO]`.
 
+### 3.1. Regla de Consulta Previa antes de Desarrollar (Alineación Obligatoria)
+* **Consultas y Auditorías:** Si el usuario realiza una pregunta de análisis, revisión arquitectónica, duda conceptual o comparación contra pautas docentes, el agente debe **responder sin modificar archivos de código ni lanzar desarrollos** salvo que el usuario lo autorice explícitamente.
+* **Cambios de Alcance o Nuevas Features:** Antes de escribir o modificar código frente a un requerimiento nuevo, cambio de diseño o tarea grande (ej. iniciar ESP32 o App Android), el agente debe:
+  1. Revisar únicamente las especificaciones relevantes en `specs/` (sin releer todo el código innecesariamente).
+  2. Señalar brechas, riesgos o decisiones técnicas que requieran criterio (ej. persistencia, seguridad de hardware, simplicidad).
+  3. **Confirmar explícitamente con el usuario** antes de implementar.
+
 ---
 
 ## 4. Estructura de Directorios del Proyecto
 
 ```text
 Proyecto Feria/
-├── AGENTS.md                               <- Este documento (Roles y Protocolos de Agentes)
+├── AGENTS.md                               <- Este documento (Roles, Modelos y Reglas SDD)
 ├── specs/                                  <- Especificaciones SDD y Logs de Progreso
-│   ├── spec-001-architecture-overview.md   <- Arquitectura General Tri-Servicio
+│   ├── spec-001-architecture-overview.md   <- Arquitectura Tri-Servicio, SQL DDL y Contratos Base
 │   ├── spec-002-field-greenhouse-service.md<- Servicio Campos / Orquídeas (Integración II)
 │   ├── spec-003-home-tower-service.md      <- Servicio Mini Torres Domiciliarias (Feria)
 │   ├── spec-004-vertical-farm-service.md   <- Servicio Invernadero Vertical Industrial
 │   ├── spec-005-frontend-adaptive-hub.md   <- Especificación de UI Adaptativa
+│   ├── spec-006-ai-and-simulation.md       <- Motor JEV, Chat Agronómico y Simulaciones
+│   ├── spec-007-esp32-firmware.md          <- Firmware C++ ESP32 DevKit V1, MQTT y Fail-Safe
+│   ├── spec-008-android-app.md             <- Aplicación Nativa Android (IEI-058)
 │   └── PROGRESS_LOGS.md                    <- Registro de Trazabilidad y Estado de Avance
 ├── ProyectoServiciosASAI/                  <- Documentación Formal Académica y de Arquitectura
 ├── backend/                                <- Servidor FastAPI Modular
@@ -132,5 +142,37 @@ Proyecto Feria/
 │   │   ├── models.py                       <- Contratos Pydantic
 │   │   └── database_schema.sql             <- Esquema SQLite / PostgreSQL
 │   └── agrosense.db                        <- Base de datos SQLite persistente
-└── firmware/                               <- Código para ESP32 DevKit V1
+├── Programacion Android/                   <- Aplicación nativa Android (IEI-058)
+└── firmware/                               <- Código C++ para ESP32 DevKit V1 (IEI-059)
 ```
+
+---
+
+## 5. Política de Orquestación, Modelos y Esfuerzos (Gemini Pro / Argon)
+
+### 5.1. Modo de Orquestación Elegido: Enjambre Nativo (`swarm`) + Subagentes Tácticos
+* **Modo Principal (`swarm`):** Es el mecanismo oficial para sprints multi-disciplina y trabajo paralelo (ej. desarrollar **Firmware ESP32** + **App Android** + **Backend MQTT** simultáneamente).
+  * **Justificación técnica:** Es el único modo que permite asignar el ID exacto de modelo y nivel de esfuerzo (`high`, `medium`, `low`), aislar carpetas de autores mediante `workspace: "share"` sin conflictos de edición, y mantener un rol verificador (`qa_verification`) auditando en paralelo mediante tablero compartido.
+* **Modo Secundario (`invoke_subagent`):** Se usa únicamente para tareas unitarias, aisladas y de un solo hilo (ej. extraer texto de una pauta PDF o consultar un archivo puntual con `flash` / `pro`), evitando el sobrecosto de tokens de abrir un enjambre cuando no existe paralelismo.
+
+### 5.2. Autorización Explícita y Matriz de Modelos / Esfuerzos
+Por instrucción expresa del propietario del proyecto (cuenta **Gemini Pro**), el Coordinador está autorizado a asignar un modelo y nivel de esfuerzo específico al crear o reasignar workers (`swarm add` / `swarm model`), siguiendo esta matriz:
+
+| Rol / Sub-agente | Alcance y Dominio | Modelo y Esfuerzo Asignado | Nivel de Razonamiento |
+| :--- | :--- | :--- | :--- |
+| `architect` / `spec_lead` | Diseño SOA, contratos Pydantic/SQL, specs SDD críticas | `gemini-4-argon-high` | Alto (sin margen de error estructural) |
+| `iot_firmware_engineer` | Firmware C++ ESP32, pulso 50 ms GPIO 25/34, MQTT y fail-safe | `gemini-4-argon-high` | Alto (seguridad física y hardware) |
+| `android_engineer` | App Android (Kotlin/Java), Retrofit, BLE/Wi-Fi y notificaciones | `gemini-4-argon-medium` *(subir a `gemini-4-argon-high` en arquitectura de red/servicios)* | Medio–Alto |
+| `backend_service_dev` | Endpoints FastAPI, routers de los 3 servicios, consultas SQLite | `gemini-3.8-flash-high` *(subir a `gemini-4-argon-medium` en refactors complejos)* | Medio–Alto (rápido sobre patrón ya definido) |
+| `frontend_ui_engineer` | UI adaptativa en `index.html`, Tailwind CSS y Fetch JS | `gemini-3.8-flash-medium` | Medio (iteración visual ágil) |
+| `academic_compliance` | Auditoría contra pautas IEI-094, IEI-059, IEI-058 y Feria | `gemini-3.8-flash-medium` | Medio |
+| `qa_verification` | Pruebas HTTP, simulación de fallos y bitácora `PROGRESS_LOGS.md` | `gemini-3.8-flash-low` *(subir a `gemini-3.8-flash-medium` en pruebas E2E)* | Bajo–Medio (verificación mecánica) |
+
+> **Regla de Cuota y Respaldo:** Los modelos `gemini-4-argon-*` tienen cuota semanal y se reservan para decisiones de arquitectura, hardware embebido crítico y lógica móvil compleja. Si algún worker agota cuota o capacidad, el Coordinador usará `swarm{action:"model"}` documentando el motivo en el tablero, sin destruir el historial del worker.
+
+### 5.3. Reglas de Concurrencia y Propiedad de Archivos
+1. **Un dueño por carpeta/archivo:** Ningún autor comparte ruta editable con otro en el mismo turno (`firmware/` -> `iot_firmware_engineer`, `Programacion Android/` -> `android_engineer`, `backend/app/routers/` -> `backend_service_dev`, `backend/app/templates/` -> `frontend_ui_engineer`).
+2. **Aislamiento de escritura (`workspace: "share"`):** Todo worker que edite o compile código en paralelo se lanza con `workspace: "share"`. Al terminar y ser verificado, sus cambios se integran limpiamente en la rama/directorio principal antes de cerrar el worker (`kill`).
+3. **Verificadores en solo lectura (`workspace: "inherit"`):** `qa_verification` y `academic_compliance` trabajan sobre `inherit`, ejecutan pruebas o inspecciones y reportan hallazgos por número de mensaje (`#seq`) al Coordinador o al autor correspondiente; nunca corrigen código directamente sobre archivos ajenos.
+4. **Cierre de ciclo SDD:** Ninguna iteración del enjambre se da por cerrada hasta que `qa_verification` valide la ejecución y el Coordinador registre el resultado en `specs/PROGRESS_LOGS.md`.
+

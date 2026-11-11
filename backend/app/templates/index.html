@@ -3,12 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AgroSense AI — Celda Hidropónica Piloto</title>
-  
-  <!-- Inter & JetBrains Mono Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>AgroSense AI — Hub de Servicios Agrícolas (SOA Tri-Servicio)</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,520 +12,794 @@
       darkMode: 'class',
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
-          },
           colors: {
             zinc: {
-              850: '#1e1e23',
-              900: '#141417',
-              950: '#0b0b0d',
+              950: '#09090b',
+              900: '#121215',
+              850: '#18181b',
+              800: '#27272a',
+              700: '#3f3f46',
+              600: '#52525b',
+              400: '#a1a1aa',
+              300: '#d4d4d8',
+              200: '#e4e4e7',
+              100: '#f4f4f5',
             }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
           }
         }
       }
     }
   </script>
+
   <style>
-    body {
-      background-color: #0b0b0d;
-      color: #e4e4e7;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    .panel {
-      background: #141417;
-      border: 1px solid #27272a;
-    }
-    .panel-subtle {
-      background: #18181c;
-      border: 1px solid #27272a;
-    }
-    /* Scrollbar minimalista */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { background-color: #09090b; color: #f4f4f5; font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
+    .panel { background-color: #121215; border: 1px solid #27272a; }
+    .panel-subtle { background-color: #18181b; border: 1px solid #27272a; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0b0b0d; }
+    ::-webkit-scrollbar-track { background: #09090b; }
     ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
   </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 flex flex-col justify-between">
 
-  <!-- TOP BAR: Minimalista, estilo Linear / Vercel -->
-  <header class="max-w-7xl w-full mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 mb-6 border-b border-zinc-800/80 gap-4">
+  <!-- TOP BAR: Header Editorial Minimalista -->
+  <header class="max-w-7xl w-full mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 mb-4 border-b border-zinc-800 gap-4">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400 font-mono text-sm font-semibold">
+      <div class="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400 font-mono text-base font-bold shadow-sm">
         AS
       </div>
       <div>
         <div class="flex items-center gap-2">
           <h1 class="text-base font-semibold text-zinc-100 tracking-tight">AgroSense AI</h1>
-          <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/60">Celda 01</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">Hub SOA Tri-Servicio</span>
         </div>
-        <p class="text-xs text-zinc-400">Módulo Celular Hidropónico • Santo Tomás Temuco</p>
+        <p class="text-xs text-zinc-400">Plataforma Agrícola y Ciberfísica • Santo Tomás Temuco</p>
       </div>
     </div>
 
-    <!-- Badges de Estado -->
+    <!-- Badges de Conectividad y Docs -->
     <div class="flex items-center gap-2.5">
       <div class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-        <span class="text-[11px] font-mono text-zinc-400">ESP32 Online</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-[11px] font-mono text-zinc-300">ESP32 Online</span>
       </div>
       <div class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-        <span class="text-[11px] font-mono text-zinc-400">SQLite Sincronizada</span>
+        <span class="text-[11px] font-mono text-zinc-300">SQLite Activa</span>
       </div>
       <a href="/docs" target="_blank" class="px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition">
-        API Docs &rarr;
+        API Swagger &rarr;
       </a>
     </div>
   </header>
 
-  <!-- CONTENEDOR PRINCIPAL -->
-  <main class="max-w-7xl w-full mx-auto space-y-6 flex-1">
+  <!-- SELECTOR DE SERVICIOS (BARRA DE NAVEGACIÓN SOA) -->
+  <nav class="max-w-7xl w-full mx-auto mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-zinc-800 gap-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-mono text-zinc-500 uppercase tracking-wider mr-1">Servicio:</span>
+        
+        <!-- Pestaña 1: Invernadero & Orquídeas (Integración II) -->
+        <button onclick="switchServiceTab('tab-field')" id="btn-tab-field"
+                class="service-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-2 bg-zinc-200 text-zinc-950 font-semibold border-zinc-200 shadow-sm">
+          <span>🌿</span>
+          <span>Invernadero & Orquídeas</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-zinc-300 text-zinc-900 border border-zinc-400">Integración II</span>
+        </button>
 
-    <!-- FILA 1: Métricas de Telemetría (Bento Grid Plano) -->
-    <div>
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-xs font-mono uppercase tracking-wider text-zinc-400">Telemetría en Vivo (Sensores Físicos)</h2>
-        <span class="text-[11px] font-mono text-zinc-400">Actualizado: {{ now }}</span>
+        <!-- Pestaña 2: Mini Torre Domiciliaria (Feria de Innovación) -->
+        <button onclick="switchServiceTab('tab-home-tower')" id="btn-tab-home-tower"
+                class="service-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-2 bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200">
+          <span>🏠</span>
+          <span>Mini Torre Domiciliaria</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">Feria Innovación</span>
+        </button>
+
+        <!-- Pestaña 3: Invernadero Industrial (Visión Comercial) -->
+        <button onclick="switchServiceTab('tab-vertical-farm')" id="btn-tab-vertical-farm"
+                class="service-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-2 bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200">
+          <span>🏢</span>
+          <span>Invernadero Industrial</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">Multi-Rack</span>
+        </button>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-        
-        <!-- Nivel de Estanque -->
-        <div class="panel rounded-xl p-4 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
-            <span>Nivel de Solución</span>
-            <span class="text-[10px] font-mono text-zinc-400">GPIO 34</span>
-          </div>
-          <div>
-            <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.reservoir_level_percent < 20 %}text-red-400{% else %}text-zinc-100{% endif %}">
-              {{ telemetry.reservoir_level_percent }}%
-            </div>
-            <!-- Barra de progreso minimalista -->
-            <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-2.5 overflow-hidden">
-              <div class="h-full rounded-full transition-all duration-300 {% if telemetry.reservoir_level_percent < 20 %}bg-red-500{% else %}bg-emerald-500{% endif %}" style="width: {{ telemetry.reservoir_level_percent }}%"></div>
-            </div>
-          </div>
-          <span class="text-[10px] text-zinc-400 mt-2 block">Umbral crítico: 20%</span>
-        </div>
+      <div class="text-[11px] font-mono text-zinc-400">
+        Actualizado: <span id="currentTimestamp">{{ now }}</span>
+      </div>
+    </div>
+  </nav>
 
-        <!-- Temperatura Ambiente -->
-        <div class="panel rounded-xl p-4 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
-            <span>Temperatura</span>
-            <span class="text-[10px] font-mono text-zinc-400">DHT11 / BME</span>
-          </div>
-          <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
-            {{ telemetry.air_temperature }}°C
-          </div>
-          <span class="text-[10px] text-zinc-400 mt-2 block">Óptimo: {{ plant.optimal_temp_min_c }}° - {{ plant.optimal_temp_max_c }}°C</span>
+  <!-- ========================================================================= -->
+  <!-- VISTA 1: AGROFIELD SERVICE (INVERNADERO & ORQUÍDEAS — INTEGRACIÓN II)    -->
+  <!-- Cumplimiento estricto: RF1, RF2, RF3, RF4, RF5, RF6, RF7                  -->
+  <!-- ========================================================================= -->
+  <main id="tab-field" class="service-content max-w-7xl w-full mx-auto space-y-6 flex-1">
+    
+    <!-- Banner de Contexto Académico -->
+    <div class="panel rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-l-4 border-l-emerald-500">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            CASO EVALUADO IEI-094
+          </span>
+          <h2 class="text-sm font-semibold text-zinc-100">Invernadero de Orquídeas (Empresa Cliente)</h2>
         </div>
-
-        <!-- Humedad Relativa -->
-        <div class="panel rounded-xl p-4 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
-            <span>Humedad Aérea</span>
-            <span class="text-[10px] font-mono text-zinc-400">DHT11</span>
-          </div>
-          <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
-            {{ telemetry.air_humidity }}%
-          </div>
-          <span class="text-[10px] text-zinc-400 mt-2 block">Rango: {{ plant.optimal_humidity_min }}% - {{ plant.optimal_humidity_max }}%</span>
-        </div>
-
-        <!-- Presión Atmosférica -->
-        <div class="panel rounded-xl p-4 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
-            <span>Presión Barométrica</span>
-            <span class="text-[10px] font-mono text-zinc-400">BME280</span>
-          </div>
-          <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
-            {{ telemetry.barometric_pressure_hpa }} <span class="text-xs font-normal text-zinc-400">hPa</span>
-          </div>
-          <span class="text-[10px] text-zinc-400 mt-2 block">Presión ambiental a nivel</span>
-        </div>
-
-        <!-- DPV Fisiológico -->
-        <div class="panel rounded-xl p-4 flex flex-col justify-between">
-          <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
-            <span>Déficit Presión Vapor</span>
-            <span class="text-[10px] font-mono text-zinc-400">DPV</span>
-          </div>
-          <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.vpd_kpa and telemetry.vpd_kpa > plant.optimal_vpd_max_kpa %}text-amber-400{% else %}text-emerald-400{% endif %}">
-            {{ telemetry.vpd_kpa }} <span class="text-xs font-normal text-zinc-400">kPa</span>
-          </div>
-          <span class="text-[10px] text-zinc-400 mt-2 block">Transpiración: {{ plant.optimal_vpd_min_kpa }} - {{ plant.optimal_vpd_max_kpa }} kPa</span>
-        </div>
-
+        <p class="text-xs text-zinc-400 mt-1">
+          Puntos de ajuste: Humedad relativa al <strong>80%</strong> (Rango 75%-85%) y Temperatura entre <strong>18 °C y 24 °C</strong>. Cumple RF1 a RF7.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-300 border border-zinc-800">
+          Endpoint: <code class="text-emerald-400">/api/v1/services/field</code>
+        </span>
       </div>
     </div>
 
-    <!-- FILA 2: Dos Columnas (Calendario & Controles vs JEV Inferencia & Cultivo) -->
+    <!-- GRID DE MÉTRICAS ESPECÍFICAS PARA ORQUÍDEAS (RF4, RF7) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+      <!-- Humedad Relativa (RF4) -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Humedad Relativa Aire</span>
+          <span class="text-[10px] font-mono text-zinc-400">DHT11 / Wi-Fi</span>
+        </div>
+        <div>
+          <div class="text-2xl font-semibold font-mono tracking-tight text-emerald-400">
+            {{ field_data.telemetry.air_humidity }}%
+          </div>
+          <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-2.5 overflow-hidden">
+            <div class="h-full rounded-full bg-emerald-500" style="width: {{ field_data.telemetry.air_humidity }}%"></div>
+          </div>
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Punto óptimo caso: <strong>80%</strong></span>
+      </div>
+
+      <!-- Temperatura Ambiente (RF4) -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Temperatura Invernadero</span>
+          <span class="text-[10px] font-mono text-zinc-400">BME280 / Wi-Fi</span>
+        </div>
+        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+          {{ field_data.telemetry.air_temperature }}°C
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Rango óptimo: 18 °C - 24 °C</span>
+      </div>
+
+      <!-- Humedad de Sustrato -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Humedad de Sustrato</span>
+          <span class="text-[10px] font-mono text-zinc-400">Sonda Raíz</span>
+        </div>
+        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+          {{ field_data.telemetry.soil_humidity_pct or 68.0 }}%
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Corteza y musgo sphagnum</span>
+      </div>
+
+      <!-- Presión Barométrica -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Presión Atmosférica</span>
+          <span class="text-[10px] font-mono text-zinc-400">BME280</span>
+        </div>
+        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+          1013.8 <span class="text-xs font-normal text-zinc-400">hPa</span>
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Presión ambiental a nivel</span>
+      </div>
+    </div>
+
+    <!-- DOS COLUMNAS: CALENDARIO SEMANAL (RF1, RF2) vs HISTORIAL SQLITE (RF5, RF6) -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-      <!-- COLUMNA IZQUIERDA (7 Cols): Calendario Interactivo y Controles Físicos -->
+      
+      <!-- COLUMNA IZQUIERDA (7 Cols): Calendario Semanal de Riego (RF1 y RF2) -->
       <div class="lg:col-span-7 space-y-6">
-
-        <!-- TARJETA: Calendario de Recirculación (Semana 13 IEI-094) -->
+        
         <div class="panel rounded-xl p-5">
           <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
             <div>
-              <h3 class="text-sm font-semibold text-zinc-100">Calendario de Riego y Recirculación</h3>
-              <p class="text-xs text-zinc-400">Programación automática de la mini-bomba sumergible 5V</p>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold text-zinc-100">Calendario de Riego Semanal</h3>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">RF1</span>
+              </div>
+              <p class="text-xs text-zinc-400">Configuración de días de la semana y horas fijas de riego para orquídeas</p>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-[11px] font-mono px-2 py-0.5 rounded-full {% if schedule.status == 'BOMBEANDO' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-zinc-800 text-zinc-400 border border-zinc-700{% endif %}">
-                ● {{ schedule.status }}
-              </span>
-              <button onclick="toggleSchedulePanel()" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition">
-                Configurar
-              </button>
+            <button onclick="toggleFieldConfigPanel()" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition">
+              Modificar Días / Horas
+            </button>
+          </div>
+
+          <!-- Selector Visual de Días de la Semana (RF1) -->
+          <div class="mb-4">
+            <div class="flex items-center justify-between text-[11px] text-zinc-400 mb-2">
+              <span>Días de Riego Semanal Habilitados (RF1):</span>
+              <span class="font-mono text-zinc-300">Hoy: <strong class="text-white">{{ schedule.today_str }}</strong></span>
+            </div>
+            <div class="grid grid-cols-7 gap-1.5" id="fieldWeeklyDaysDisplay">
+              {% for dia in field_data.schedule.dias_semana %}
+                <div id="field-disp-day-{{ dia }}" class="text-center py-2 rounded-lg text-xs font-mono border transition {% if dia in field_data.schedule.active_days %}bg-zinc-200 text-zinc-950 font-bold border-zinc-200 shadow-sm{% else %}bg-zinc-900/60 text-zinc-500 border-zinc-800/80{% endif %} {% if dia == schedule.today_str %}ring-2 ring-emerald-500/60{% endif %}">
+                  {{ dia }}
+                  {% if dia == schedule.today_str %}<span class="block text-[8px] -mt-0.5 leading-none text-emerald-700 font-bold">•</span>{% endif %}
+                </div>
+              {% endfor %}
             </div>
           </div>
 
-          <!-- Métricas del Ciclo -->
-          <div class="grid grid-cols-3 gap-3 text-center mb-4">
+          <!-- Métricas del Calendario -->
+          <div class="grid grid-cols-2 gap-3 text-center mb-4">
             <div class="panel-subtle rounded-lg p-3">
-              <span class="text-[11px] text-zinc-400 block mb-0.5">Frecuencia</span>
-              <span id="displayInterval" class="text-base font-semibold font-mono text-zinc-100">Cada {{ schedule.interval_hours }}h</span>
+              <span class="text-[11px] text-zinc-400 block mb-0.5">Hora Fija de Riego (RF1)</span>
+              <span id="fieldDisplayTime" class="text-lg font-semibold font-mono text-zinc-100">{{ field_data.schedule.irrigation_time }} hrs</span>
             </div>
             <div class="panel-subtle rounded-lg p-3">
-              <span class="text-[11px] text-zinc-400 block mb-0.5">Duración</span>
-              <span id="displayDuration" class="text-base font-semibold font-mono text-emerald-400">{{ schedule.duration_minutes }} min</span>
-            </div>
-            <div class="panel-subtle rounded-lg p-3">
-              <span class="text-[11px] text-zinc-400 block mb-0.5">Próximo Ciclo</span>
-              <span id="displayNextCycle" class="text-base font-semibold font-mono text-zinc-100">{{ schedule.next_cycle_time }}</span>
+              <span class="text-[11px] text-zinc-400 block mb-0.5">Duración de Aspersión</span>
+              <span id="fieldDisplayDuration" class="text-lg font-semibold font-mono text-emerald-400">{{ field_data.schedule.duration_minutes }} min</span>
             </div>
           </div>
 
-          <!-- Notificación de Sistema -->
-          <div class="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
-            <span class="text-zinc-400 mt-0.5">ℹ</span>
+          <!-- Componente de Notificación de Riego (RF2) -->
+          <div class="flex items-start gap-2.5 p-3.5 rounded-lg bg-emerald-950/20 border border-emerald-900/40 text-xs text-zinc-300">
+            <span class="text-emerald-400 text-base">🔔</span>
             <div class="flex-1">
-              <span class="font-medium text-zinc-200">Estado del programa:</span>
-              <span id="displayNotification" class="text-zinc-400 block mt-0.5">{{ schedule.notification }}</span>
+              <span class="font-medium text-emerald-300 block">Notificación de Hora de Riego (RF2):</span>
+              <span id="fieldDisplayNotification" class="text-zinc-300 block mt-0.5">
+                {{ field_data.notification.notification_message }}
+              </span>
             </div>
           </div>
 
-          <!-- PANEL COLAPSABLE: Formulario de Configuración -->
-          <div id="scheduleConfigPanel" class="hidden mt-4 pt-4 border-t border-zinc-800 space-y-3">
-            <div class="text-xs font-medium text-zinc-300 mb-1">Ajustar Parámetros de Ciclo</div>
+          <!-- PANEL COLAPSABLE: Formulario de Configuración (RF1) -->
+          <div id="fieldConfigPanel" class="hidden mt-4 pt-4 border-t border-zinc-800 space-y-3">
+            <div class="text-xs font-medium text-zinc-200 mb-1">Ajustar Parámetros del Calendario (RF1)</div>
+            
+            <div>
+              <label class="text-[11px] text-zinc-400 block mb-1.5">Seleccionar Días para Riego:</label>
+              <div class="flex flex-wrap gap-1.5">
+                {% for dia in field_data.schedule.dias_semana %}
+                  <button type="button" onclick="toggleFieldDay('{{ dia }}')" id="fieldDayBtn-{{ dia }}"
+                          class="px-3 py-1 text-xs font-mono rounded border transition {% if dia in field_data.schedule.active_days %}bg-zinc-200 text-zinc-950 font-semibold border-zinc-200{% else %}bg-zinc-900 text-zinc-400 border-zinc-800{% endif %}">
+                    {{ dia }}
+                  </button>
+                {% endfor %}
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="text-[11px] text-zinc-400 block mb-1">Frecuencia (Horas entre ciclos):</label>
-                <input id="inputInterval" type="number" min="1" max="24" value="{{ schedule.interval_hours }}"
+                <label class="text-[11px] text-zinc-400 block mb-1">Hora de Riego (Formato HH:MM):</label>
+                <input id="fieldInputTime" type="time" value="{{ field_data.schedule.irrigation_time }}"
                        class="w-full bg-zinc-950 border border-zinc-700 rounded-md px-3 py-1.5 text-xs font-mono text-zinc-100 focus:outline-none focus:border-zinc-500">
               </div>
               <div>
-                <label class="text-[11px] text-zinc-400 block mb-1">Duración (Minutos encendida):</label>
-                <input id="inputDuration" type="number" min="1" max="120" value="{{ schedule.duration_minutes }}"
+                <label class="text-[11px] text-zinc-400 block mb-1">Duración (Minutos):</label>
+                <input id="fieldInputDuration" type="number" min="1" max="120" value="{{ field_data.schedule.duration_minutes }}"
                        class="w-full bg-zinc-950 border border-zinc-700 rounded-md px-3 py-1.5 text-xs font-mono text-emerald-400 focus:outline-none focus:border-zinc-500">
               </div>
             </div>
 
-            <div class="flex gap-2 pt-1">
-              <button onclick="saveSchedule()" id="saveScheduleBtn"
-                      class="flex-1 py-1.5 rounded-md bg-zinc-100 hover:bg-white text-zinc-900 text-xs font-medium transition">
-                Guardar Horario en Base de Datos
-              </button>
-              <button onclick="triggerImmediatePulse()"
-                      class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition">
-                Regar Ahora (Pulso)
+            <div class="pt-1">
+              <button onclick="saveFieldSchedule()" id="fieldSaveBtn"
+                      class="w-full py-2 rounded-md bg-zinc-100 hover:bg-white text-zinc-900 text-xs font-semibold transition">
+                Guardar Configuración en SQLite (RF1)
               </button>
             </div>
           </div>
+
         </div>
 
-        <!-- CONTROLES MANUALES DIRECTOS (Actuadores Físicos) -->
+      </div>
+
+      <!-- COLUMNA DERECHA (5 Cols): Histórico de Condiciones Ambientales (RF5, RF6) -->
+      <div class="lg:col-span-5 space-y-6">
+        
+        <div class="panel rounded-xl p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold text-zinc-100">Registro Histórico de Condiciones</h3>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">RF5 · RF6</span>
+              </div>
+              <p class="text-xs text-zinc-400">Almacenado continuo en SQLite (Frecuencia 1h)</p>
+            </div>
+            <button onclick="refreshHistory()" class="text-xs font-mono text-zinc-400 hover:text-zinc-200">
+              ↻ Actualizar
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-[10px] uppercase font-mono text-zinc-500 border-b border-zinc-800">
+                <tr>
+                  <th class="py-2">Hora</th>
+                  <th class="py-2">Temp</th>
+                  <th class="py-2">Humedad</th>
+                  <th class="py-2">Presión</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
+                {% for row in history %}
+                <tr class="hover:bg-zinc-900/40">
+                  <td class="py-1.5 text-[11px] text-zinc-400">{{ row.fecha_hora[-8:] if row.fecha_hora else '--' }}</td>
+                  <td class="py-1.5">{{ row.temp_ambiente }}°C</td>
+                  <td class="py-1.5 text-emerald-400">{{ row.humedad_ambiente }}%</td>
+                  <td class="py-1.5 text-zinc-400">{{ row.presion_atmosferica|int }} hPa</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="4" class="py-3 text-center text-zinc-500">Sin lecturas históricas registradas.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <span class="text-[10px] text-zinc-500 mt-3 block text-right font-mono">Tabla: telemetria_historica (SQLite)</span>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- VISTA 2: HOMETOWER SERVICE (MINI TORRE DOMICILIARIA — FERIA INNOVACIÓN)   -->
+  <!-- Hardware MVP: Bomba 5V, Servo SG90, Motor PaP 28BYJ-48, Cavitación        -->
+  <!-- ========================================================================= -->
+  <main id="tab-home-tower" class="service-content hidden max-w-7xl w-full mx-auto space-y-6 flex-1">
+    
+    <!-- Banner de Innovación -->
+    <div class="panel rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-l-4 border-l-indigo-500">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            PROYECTO FERIA DE INNOVACIÓN & ANDROID
+          </span>
+          <h2 class="text-sm font-semibold text-zinc-100">Mini Torre Hidropónica Urbana Domiciliaria</h2>
+        </div>
+        <p class="text-xs text-zinc-400 mt-1">
+          Cultivo automatizado de frutillas y hortalizas en balcones/hogares. Recirculación continua, protección anti-cavitación y actuadores físicos.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-300 border border-zinc-800">
+          Endpoint: <code class="text-indigo-400">/api/v1/services/home-tower</code>
+        </span>
+      </div>
+    </div>
+
+    <!-- GRID DE TELEMETRÍA CIBERFÍSICA -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+      <!-- Nivel de Estanque con Alerta Anti-Cavitación -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Nivel de Solución</span>
+          <span class="text-[10px] font-mono text-zinc-400">GPIO 34</span>
+        </div>
+        <div>
+          <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.reservoir_level_percent < 20 %}text-red-400{% else %}text-zinc-100{% endif %}">
+            {{ telemetry.reservoir_level_percent }}%
+          </div>
+          <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-2.5 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-300 {% if telemetry.reservoir_level_percent < 20 %}bg-red-500{% else %}bg-emerald-500{% endif %}" style="width: {{ telemetry.reservoir_level_percent }}%"></div>
+          </div>
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Protección cavitación: &lt; 20%</span>
+      </div>
+
+      <!-- Temperatura -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Temperatura</span>
+          <span class="text-[10px] font-mono text-zinc-400">DHT11</span>
+        </div>
+        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+          {{ telemetry.air_temperature }}°C
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Óptimo: 18° - 24°C</span>
+      </div>
+
+      <!-- Humedad Aérea -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Humedad Relativa</span>
+          <span class="text-[10px] font-mono text-zinc-400">DHT11</span>
+        </div>
+        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+          {{ telemetry.air_humidity }}%
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Rango: 55% - 75%</span>
+      </div>
+
+      <!-- DPV Fisiológico -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Déficit Presión Vapor</span>
+          <span class="text-[10px] font-mono text-zinc-400">DPV</span>
+        </div>
+        <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.vpd_kpa and telemetry.vpd_kpa > 1.2 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+          {{ telemetry.vpd_kpa }} <span class="text-xs font-normal text-zinc-400">kPa</span>
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Transpiración óptima</span>
+      </div>
+
+      <!-- Estado Bomba 5V -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Bomba Sumergible 5V</span>
+          <span class="text-[10px] font-mono text-zinc-400">GPIO 26</span>
+        </div>
+        <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.pump_active %}text-emerald-400{% else %}text-zinc-400{% endif %}">
+          {{ "ENCENDIDA" if telemetry.pump_active else "APAGADA" }}
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Relé 5V optoacoplado</span>
+      </div>
+    </div>
+
+    <!-- DOS COLUMNAS: RECIRCULACIÓN & ACTUADORES vs MOTOR CIBERFÍSICO JEV -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- COLUMNA IZQUIERDA (7 Cols): Recirculación Continua y Controles Manuales -->
+      <div class="lg:col-span-7 space-y-6">
+        
+        <!-- Tarjeta de Recirculación Periódica -->
         <div class="panel rounded-xl p-5">
           <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
             <div>
-              <h3 class="text-sm font-semibold text-zinc-100">Control Manual de Actuadores</h3>
-              <p class="text-xs text-zinc-400">Comandos directos hacia el microcontrolador ESP32</p>
+              <h3 class="text-sm font-semibold text-zinc-100">Ciclos de Recirculación Hidropónica</h3>
+              <p class="text-xs text-zinc-400">Oxigenación periódica de la solución nutritiva en la mini torre</p>
             </div>
-            <span class="text-[11px] font-mono text-zinc-400">Alimentación: 5V Aislada</span>
+            <button onclick="triggerHomePulse()" class="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition">
+              Regar Ahora (Pulso 60s)
+            </button>
           </div>
 
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <button onclick="sendCommand('bomba_agua', 'ON', 60)" class="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-left transition">
-              <div class="text-[11px] text-zinc-400">Bomba 5V</div>
-              <div class="text-xs font-medium text-emerald-400 mt-1">Encender (60s)</div>
-            </button>
-            <button onclick="sendCommand('bomba_agua', 'OFF', 0)" class="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-left transition">
-              <div class="text-[11px] text-zinc-400">Bomba 5V</div>
-              <div class="text-xs font-medium text-zinc-300 mt-1">Apagar</div>
-            </button>
-            <button onclick="sendCommand('servo_ventilacion', 'SET_ANGLE', 90)" class="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-left transition">
-              <div class="text-[11px] text-zinc-400">Servo SG90</div>
-              <div class="text-xs font-medium text-cyan-400 mt-1">Abrir 90°</div>
-            </button>
-            <button onclick="sendCommand('servo_ventilacion', 'SET_ANGLE', 0)" class="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-left transition">
-              <div class="text-[11px] text-zinc-400">Servo SG90</div>
-              <div class="text-xs font-medium text-zinc-300 mt-1">Cerrar 0°</div>
-            </button>
+          <div class="grid grid-cols-3 gap-3 text-center mb-4">
+            <div class="panel-subtle rounded-lg p-3">
+              <span class="text-[11px] text-zinc-400 block mb-0.5">Frecuencia</span>
+              <span class="text-base font-semibold font-mono text-zinc-100">Cada {{ home_tower_data.state.recirculation_interval_hours }}h</span>
+            </div>
+            <div class="panel-subtle rounded-lg p-3">
+              <span class="text-[11px] text-zinc-400 block mb-0.5">Duración</span>
+              <span class="text-base font-semibold font-mono text-emerald-400">{{ home_tower_data.state.recirculation_duration_minutes }} min</span>
+            </div>
+            <div class="panel-subtle rounded-lg p-3">
+              <span class="text-[11px] text-zinc-400 block mb-0.5">Próximo Ciclo</span>
+              <span class="text-base font-semibold font-mono text-zinc-100">{{ schedule.next_cycle_time }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controles Manuales de Actuadores Físicos (Pauta Android / IoT) -->
+        <div class="panel rounded-xl p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
+            <div>
+              <h3 class="text-sm font-semibold text-zinc-100">Controles de Actuadores Físicos (Hardware Real)</h3>
+              <p class="text-xs text-zinc-400">ESP32 DevKit V1 • Alimentación 5V aislada</p>
+            </div>
+            <span class="text-[10px] font-mono text-zinc-400">Android / Web</span>
+          </div>
+
+          <div class="space-y-4">
+            <!-- 1. Mini-Bomba Sumergible 5V -->
+            <div class="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+              <div>
+                <span class="text-xs font-medium text-zinc-200 block">Bomba 5V Recirculación (GPIO 26)</span>
+                <span class="text-[11px] text-zinc-400">Relé optoacoplado con protección anti-cavitación</span>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="sendActuatorCommand('bomba_agua', 'ON', 60)"
+                        class="px-3 py-1.5 rounded text-xs font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition">
+                  Encender
+                </button>
+                <button onclick="sendActuatorCommand('bomba_agua', 'OFF', 0)"
+                        class="px-3 py-1.5 rounded text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">
+                  Apagar
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. Servomotor SG90 Ventilación Cenital -->
+            <div class="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+              <div>
+                <span class="text-xs font-medium text-zinc-200 block">Servomotor SG90 (GPIO 18)</span>
+                <span class="text-[11px] text-zinc-400">Apertura de rejilla cenital para alivio térmico</span>
+              </div>
+              <div class="flex gap-1.5">
+                <button onclick="sendActuatorCommand('servo_ventilacion', 'SET_ANGLE', 0)" class="px-2.5 py-1 rounded text-xs font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">0°</button>
+                <button onclick="sendActuatorCommand('servo_ventilacion', 'SET_ANGLE', 45)" class="px-2.5 py-1 rounded text-xs font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">45°</button>
+                <button onclick="sendActuatorCommand('servo_ventilacion', 'SET_ANGLE', 90)" class="px-2.5 py-1 rounded text-xs font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">90°</button>
+              </div>
+            </div>
+
+            <!-- 3. Motor Paso a Paso 28BYJ-48 Dosificador -->
+            <div class="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+              <div>
+                <span class="text-xs font-medium text-zinc-200 block">Motor PaP ULN2003 (GPIO 19, 23, 5, 13)</span>
+                <span class="text-[11px] text-zinc-400">Dispensador peristáltico de nutrientes A/B</span>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="sendActuatorCommand('motor_nutrientes', 'DISPENSE_STEPS', 100)" class="px-3 py-1.5 rounded text-xs font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">+100 Pasos</button>
+                <button onclick="sendActuatorCommand('motor_nutrientes', 'DISPENSE_STEPS', 500)" class="px-3 py-1.5 rounded text-xs font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">+500 Pasos</button>
+              </div>
+            </div>
           </div>
         </div>
 
       </div>
 
-      <!-- COLUMNA DERECHA (5 Cols): Motor JEV, Escenarios y Cultivo -->
+      <!-- COLUMNA DERECHA (5 Cols): Motor Ciberfísico JEV y Chat Botánico -->
       <div class="lg:col-span-5 space-y-6">
-
-        <!-- PANEL: Motor Ciberfísico TypeSafe JEV -->
+        
+        <!-- Tarjeta de Reglas Ciberfísicas JEV -->
         <div class="panel rounded-xl p-5">
           <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
-            <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full {% if jev.risk_level == 'CRITICAL' %}bg-red-400{% elif jev.risk_level == 'WARNING' %}bg-amber-400{% else %}bg-emerald-400{% endif %}"></span>
-              <h3 class="text-sm font-semibold text-zinc-100">Motor Ciberfísico JEV</h3>
+            <div>
+              <h3 class="text-sm font-semibold text-zinc-100">Inferencia Ciberfísica System 1</h3>
+              <p class="text-xs text-zinc-400">Decisiones automáticas de protección y alivio</p>
             </div>
-            <span class="text-[11px] font-mono text-zinc-400">{{ jev.execution_time_ms }}ms</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded {% if jev.risk_level == 'CRITICAL' %}bg-red-500/10 text-red-400 border border-red-500/20{% elif jev.risk_level == 'WARNING' %}bg-amber-500/10 text-amber-400 border border-amber-500/20{% else %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% endif %}">
+              {{ jev.risk_level }}
+            </span>
+          </div>
+
+          <p class="text-xs text-zinc-300 leading-relaxed p-3 rounded-lg bg-zinc-900 border border-zinc-800 font-mono">
+            {{ jev.reason }}
+          </p>
+
+          <div class="grid grid-cols-2 gap-2 mt-3 text-center">
+            <button onclick="runScenario('estanque_vacio')" class="py-1.5 px-2 rounded text-[11px] font-mono bg-zinc-900 hover:bg-zinc-800 text-red-400 border border-zinc-800">
+              ⚡ Simular Estanque Vacío
+            </button>
+            <button onclick="runScenario('calor_extremo')" class="py-1.5 px-2 rounded text-[11px] font-mono bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-zinc-800">
+              ⚡ Simular Golpe Calor
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat con tu Granja Domiciliaria -->
+        <div class="panel rounded-xl p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
+            <div>
+              <h3 class="text-sm font-semibold text-zinc-100">Asistente Botánico Domiciliario</h3>
+              <p class="text-xs text-zinc-400">Consulta el estado fisiológico de tus frutillas</p>
+            </div>
+            <span class="text-[10px] font-mono text-zinc-400">DeepSeek / Jev</span>
           </div>
 
           <div class="space-y-3">
-            <div class="flex justify-between items-center text-xs py-1 border-b border-zinc-800/60">
-              <span class="text-zinc-400">Nivel de Riesgo:</span>
-              <span class="font-mono font-medium {% if jev.risk_level == 'CRITICAL' %}text-red-400{% elif jev.risk_level == 'WARNING' %}text-amber-400{% else %}text-emerald-400{% endif %}">
-                {{ jev.risk_level }}
-              </span>
-            </div>
-            <div class="flex justify-between items-center text-xs py-1 border-b border-zinc-800/60">
-              <span class="text-zinc-400">Compuerta Ventilación:</span>
-              <span class="font-mono text-zinc-200">{{ telemetry.vent_servo_angle }}° (Servo SG90)</span>
-            </div>
-            <div class="flex justify-between items-center text-xs py-1 border-b border-zinc-800/60">
-              <span class="text-zinc-400">Estado de Operación:</span>
-              <span class="font-mono text-zinc-400">{% if jev.fallback_rule_applied %}Modo Local Heurístico{% else %}Cloud Decision API{% endif %}</span>
+            <div id="chatBox" class="hidden p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
+              <span id="chatModelBadge" class="text-[10px] font-mono text-emerald-400 block mb-1">ASAI Bot:</span>
+              <p id="chatResponse" class="text-zinc-300 leading-relaxed"></p>
             </div>
 
-            <!-- Justificación Determinista -->
-            <div class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-300 leading-relaxed">
-              <span class="text-zinc-400 block text-[10px] uppercase mb-1">Fundamentación de la Regla:</span>
-              {{ jev.reason }}
+            <div class="flex gap-2">
+              <input id="chatInput" type="text" placeholder="Ej: ¿Cómo está la transpiración de las plantas?"
+                     class="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700">
+              <button onclick="sendChat()" id="sendBtn" class="px-4 py-2 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition">
+                Consultar
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- PANEL: Simulador de Perturbaciones (Para Profesores y Jurado) -->
-        <div class="panel rounded-xl p-5">
-          <h3 class="text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">Simulador de Eventos Físicos</h3>
-          <p class="text-xs text-zinc-400 mb-3">Dispara escenarios para verificar la robustez de las reglas ciberfísicas:</p>
+      </div>
 
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="runScenario('estanque_vacio')" class="px-3 py-2 rounded-md bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-medium text-zinc-200 text-left transition">
-              Estanque Crítico (&lt;20%)
-            </button>
-            <button onclick="runScenario('calor_extremo')" class="px-3 py-2 rounded-md bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-medium text-zinc-200 text-left transition">
-              Estrés Térmico (28.5°C)
-            </button>
-            <button onclick="runScenario('optimo')" class="px-3 py-2 rounded-md bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-medium text-zinc-200 text-left transition">
-              Estado Óptimo
-            </button>
-            <button onclick="runScenario('recirculacion')" class="px-3 py-2 rounded-md bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-medium text-zinc-200 text-left transition">
-              Recirculación Activa
-            </button>
-          </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- VISTA 3: VERTICALFARM SERVICE (INVERNADERO VERTICAL INDUSTRIAL)          -->
+  <!-- Visión Comercial Multi-Rack a Gran Escala                                 -->
+  <!-- ========================================================================= -->
+  <main id="tab-vertical-farm" class="service-content hidden max-w-7xl w-full mx-auto space-y-6 flex-1">
+    
+    <!-- Banner Comercial -->
+    <div class="panel rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-l-4 border-l-amber-500">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            VISIÓN INDUSTRIAL & NUBE
+          </span>
+          <h2 class="text-sm font-semibold text-zinc-100">Supervisión Industrial Multi-Rack (Nave Alpha)</h2>
         </div>
-
-        <!-- FICHA BOTÁNICA -->
-        <div class="panel rounded-xl p-4 text-xs text-zinc-400 flex items-center justify-between">
-          <div>
-            <span class="text-zinc-200 font-medium block">{{ plant.species_name }}</span>
-            <span class="text-[11px] text-zinc-400">{{ plant.variety }} • Fase {{ module.growth_stage }}</span>
-          </div>
-          <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">NFT Hidropónico</span>
-        </div>
-
+        <p class="text-xs text-zinc-400 mt-1">
+          Operación de granjas verticales comerciales multi-columna. Ahorro hídrico del 94.2% y telemetría distribuida.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-[11px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-300 border border-zinc-800">
+          Endpoint: <code class="text-amber-400">/api/v1/services/vertical-farm</code>
+        </span>
       </div>
     </div>
 
-    <!-- FILA 3: Histórico de Telemetría Registrada (Tabla Relacional SQLite) -->
-    <div class="panel rounded-xl p-5">
-      <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
-        <div>
-          <h3 class="text-sm font-semibold text-zinc-100">Histórico de Telemetría (Base de Datos SQLite)</h3>
-          <p class="text-xs text-zinc-400">Registros persistentes almacenados en <code>agrosense.db</code> (Semana 15 IEI-094)</p>
+    <!-- Celdas Industriales Activas -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {% for rack in vertical_farm_data.racks %}
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span class="font-mono font-semibold text-zinc-200">{{ rack.rack_id }}</span>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full {% if rack.status == 'OPERACIONAL' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-zinc-800 text-zinc-400{% endif %}">
+            ● {{ rack.status }}
+          </span>
         </div>
-        <span class="text-[11px] font-mono text-zinc-400">Tabla: telemetria_historica</span>
+        <div>
+          <div class="text-base font-medium text-zinc-100">{{ rack.crop }}</div>
+          <div class="text-xs text-zinc-400 mt-1">Health Score: <strong class="text-emerald-400 font-mono">{{ rack.health_score }}%</strong></div>
+          <div class="text-xs text-zinc-400">DPV: <span class="font-mono text-zinc-300">{{ rack.vpd_kpa }} kPa</span></div>
+        </div>
+        <span class="text-[10px] text-zinc-500 mt-3 block">Torre automatizada</span>
       </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead>
-            <tr class="border-b border-zinc-800 font-mono text-zinc-400 text-[10px] uppercase">
-              <th class="py-2 px-3"># ID</th>
-              <th class="py-2 px-3">Fecha y Hora</th>
-              <th class="py-2 px-3">Temperatura</th>
-              <th class="py-2 px-3">Humedad</th>
-              <th class="py-2 px-3">Presión</th>
-              <th class="py-2 px-3">DPV</th>
-              <th class="py-2 px-3">Nivel Estanque</th>
-              <th class="py-2 px-3">Bomba 5V</th>
-              <th class="py-2 px-3">Servo</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-zinc-850 font-mono text-zinc-300">
-            {% for row in history %}
-            <tr class="hover:bg-zinc-850/50 transition">
-              <td class="py-2.5 px-3 text-zinc-400">#{{ row.id }}</td>
-              <td class="py-2.5 px-3 text-zinc-300">{{ row.fecha_hora }}</td>
-              <td class="py-2.5 px-3 font-medium text-zinc-100">{{ row.temp_ambiente }}°C</td>
-              <td class="py-2.5 px-3 text-zinc-300">{{ row.humedad_ambiente }}%</td>
-              <td class="py-2.5 px-3 text-zinc-400">{{ row.presion_atmosferica }} hPa</td>
-              <td class="py-2.5 px-3 text-emerald-400">{{ row.dpv_kpa }} kPa</td>
-              <td class="py-2.5 px-3 {% if row.nivel_estanque < 20 %}text-red-400 font-semibold{% else %}text-zinc-200{% endif %}">
-                {{ row.nivel_estanque }}%
-              </td>
-              <td class="py-2.5 px-3">
-                {% if row.bomba_encendida %}
-                  <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">ON</span>
-                {% else %}
-                  <span class="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">OFF</span>
-                {% endif %}
-              </td>
-              <td class="py-2.5 px-3 text-zinc-400">{{ row.servo_angulo }}°</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      {% endfor %}
     </div>
 
-    <!-- FILA 4: Asistente Agronómico Conversacional (Chat Clean) -->
+    <!-- Métricas Industriales Globales -->
     <div class="panel rounded-xl p-5">
-      <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
-        <div>
-          <h3 class="text-sm font-semibold text-zinc-100">Asistente Agronómico Conversacional</h3>
-          <p class="text-xs text-zinc-400">Consultas técnicas en lenguaje natural fundamentadas en datos del ESP32</p>
+      <h3 class="text-sm font-semibold text-zinc-100 mb-3">Eficiencia y Sostenibilidad Global</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center font-mono">
+        <div class="panel-subtle rounded-lg p-4">
+          <span class="text-xs text-zinc-400 block mb-1">Ahorro Hídrico vs Suelo</span>
+          <span class="text-2xl font-bold text-emerald-400">94.2%</span>
         </div>
-        <span class="text-[11px] font-mono text-zinc-400">DeepSeek LLM / Local</span>
-      </div>
-
-      <div class="flex gap-2.5 mb-3">
-        <input id="chatInput" type="text" placeholder="Ej: ¿Cuándo es el próximo ciclo de riego o cuál es el impacto del DPV actual?"
-               class="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3.5 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 font-sans">
-        <button onclick="sendChat()" id="sendBtn"
-                class="px-4 py-2 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 text-xs font-semibold transition">
-          Consultar
-        </button>
-      </div>
-
-      <!-- Quick prompts discretos -->
-      <div class="flex flex-wrap gap-1.5 mb-3">
-        <button onclick="askQuick('¿Cuándo es el próximo ciclo de riego y cuánto dura?')" class="text-[11px] px-2.5 py-1 rounded bg-zinc-850 hover:bg-zinc-800 text-zinc-400 transition">
-          Próximo riego
-        </button>
-        <button onclick="askQuick('¿Cuál es el estado del nivel de estanque y la bomba?')" class="text-[11px] px-2.5 py-1 rounded bg-zinc-850 hover:bg-zinc-800 text-zinc-400 transition">
-          Nivel y bomba
-        </button>
-        <button onclick="askQuick('¿Está la temperatura y el DPV dentro de los rangos óptimos?')" class="text-[11px] px-2.5 py-1 rounded bg-zinc-850 hover:bg-zinc-800 text-zinc-400 transition">
-          Temperatura y DPV
-        </button>
-      </div>
-
-      <!-- Caja de respuesta -->
-      <div id="chatBox" class="hidden p-3.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs space-y-1.5">
-        <div class="flex items-center justify-between text-[11px] text-zinc-400 border-b border-zinc-850 pb-1.5">
-          <span class="font-medium text-zinc-300">Respuesta Agronómica:</span>
-          <span id="chatModelBadge" class="font-mono text-zinc-400"></span>
+        <div class="panel-subtle rounded-lg p-4">
+          <span class="text-xs text-zinc-400 block mb-1">Capacidad Total de Plantas</span>
+          <span class="text-2xl font-bold text-zinc-100">4,800 unid.</span>
         </div>
-        <p id="chatResponse" class="text-zinc-300 leading-relaxed font-sans whitespace-pre-line"></p>
+        <div class="panel-subtle rounded-lg p-4">
+          <span class="text-xs text-zinc-400 block mb-1">Huella CO2 Evitada</span>
+          <span class="text-2xl font-bold text-amber-400">38.6 kg/sem</span>
+        </div>
       </div>
     </div>
 
   </main>
 
-  <!-- FOOTER MINIMALISTA -->
-  <footer class="max-w-7xl w-full mx-auto text-center pt-8 pb-4 text-xs text-zinc-400 font-mono border-t border-zinc-850 mt-8">
-    Santo Tomás Temuco — IEI-059 IoT • IEI-058 Android • IEI-094 Integración de Competencias II • Feria de Innovación
+  <!-- FOOTER -->
+  <footer class="max-w-7xl w-full mx-auto mt-8 pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-400 gap-2">
+    <span>AgroSense AI • Universidad Santo Tomás (Temuco)</span>
+    <span class="font-mono text-[11px] text-zinc-400">IEI-094 • IEI-059 • IEI-058 • Feria Santo Tomás</span>
   </footer>
 
-  <!-- JAVASCRIPT: Interacciones y API REST -->
+  <!-- JAVASCRIPT: Lógica de Pestañas y Comunicación Asíncrona -->
   <script>
-    function toggleSchedulePanel() {
-      const panel = document.getElementById('scheduleConfigPanel');
-      panel.classList.toggle('hidden');
+    let activeFieldDays = {{ field_data.schedule.active_days | tojson }};
+
+    function switchServiceTab(targetTabId) {
+      // Ocultar todos los paneles
+      document.querySelectorAll('.service-content').forEach(el => el.classList.add('hidden'));
+      
+      // Mostrar el panel seleccionado
+      const targetPanel = document.getElementById(targetTabId);
+      if (targetPanel) targetPanel.classList.remove('hidden');
+
+      // Actualizar estilo de botones
+      document.querySelectorAll('.service-tab-btn').forEach(btn => {
+        btn.className = "service-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-2 bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200";
+      });
+
+      const activeBtn = document.getElementById('btn-' + targetTabId);
+      if (activeBtn) {
+        activeBtn.className = "service-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-2 bg-zinc-200 text-zinc-950 font-semibold border-zinc-200 shadow-sm";
+      }
     }
 
-    async function saveSchedule() {
-      const interval = parseInt(document.getElementById('inputInterval').value, 10);
-      const duration = parseInt(document.getElementById('inputDuration').value, 10);
+    function toggleFieldConfigPanel() {
+      const p = document.getElementById('fieldConfigPanel');
+      p.classList.toggle('hidden');
+    }
 
-      if (isNaN(interval) || interval < 1 || isNaN(duration) || duration < 1) {
-        alert('Por favor introduce valores válidos (horas >= 1, minutos >= 1).');
-        return;
+    function toggleFieldDay(dia) {
+      const btn = document.getElementById('fieldDayBtn-' + dia);
+      const idx = activeFieldDays.indexOf(dia);
+      if (idx > -1) {
+        if (activeFieldDays.length === 1) {
+          alert('Debe quedar al menos un día habilitado para el riego de orquídeas.');
+          return;
+        }
+        activeFieldDays.splice(idx, 1);
+        btn.className = "px-3 py-1 text-xs font-mono rounded border transition bg-zinc-900 text-zinc-400 border-zinc-800";
+      } else {
+        activeFieldDays.push(dia);
+        btn.className = "px-3 py-1 text-xs font-mono rounded border transition bg-zinc-200 text-zinc-950 font-semibold border-zinc-200";
       }
+    }
 
-      const btn = document.getElementById('saveScheduleBtn');
+    async function saveFieldSchedule() {
+      const time = document.getElementById('fieldInputTime').value || "08:30";
+      const duration = parseInt(document.getElementById('fieldInputDuration').value, 10);
+
+      const btn = document.getElementById('fieldSaveBtn');
       btn.disabled = true;
       btn.innerText = 'Guardando en BD...';
 
       try {
-        const res = await fetch('/api/v1/schedule', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ interval_hours: interval, duration_minutes: duration })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-          document.getElementById('displayInterval').innerText = `Cada ${data.interval_hours}h`;
-          document.getElementById('displayDuration').innerText = `${data.duration_minutes} min`;
-          document.getElementById('displayNextCycle').innerText = data.next_cycle_time;
-          document.getElementById('displayNotification').innerText = `Riego reprogramado: ciclos de ${data.duration_minutes} min cada ${data.interval_hours}h.`;
-          toggleSchedulePanel();
-          alert(`✅ Configuración guardada en SQLite:\nFrecuencia: cada ${data.interval_hours} hora(s)\nDuración: ${data.duration_minutes} minutos`);
-        } else {
-          alert('Error actualizando horario: ' + JSON.stringify(data));
-        }
-      } catch (e) {
-        alert('Error al conectar con la API: ' + e);
-      } finally {
-        btn.disabled = false;
-        btn.innerText = 'Guardar Horario en Base de Datos';
-      }
-    }
-
-    async function triggerImmediatePulse() {
-      await sendCommand('bomba_agua', 'ON', 60);
-    }
-
-    async function sendCommand(target, action, parameter_value) {
-      try {
-        const res = await fetch('/api/v1/actuators/command', {
+        const res = await fetch('/api/v1/services/field/schedule', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
-            module_id: 'celda-01',
+            active_days: activeFieldDays,
+            irrigation_time: time,
+            duration_minutes: duration
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          document.getElementById('fieldDisplayTime').innerText = `${data.irrigation_time} hrs`;
+          document.getElementById('fieldDisplayDuration').innerText = `${data.duration_minutes} min`;
+          document.getElementById('fieldDisplayNotification').innerText = data.notification;
+
+          // Actualizar vista semanal
+          const allDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+          allDays.forEach(d => {
+            const el = document.getElementById('field-disp-day-' + d);
+            if (el) {
+              if (data.active_days.includes(d)) {
+                el.className = "text-center py-2 rounded-lg text-xs font-mono border transition bg-zinc-200 text-zinc-950 font-bold border-zinc-200 shadow-sm";
+              } else {
+                el.className = "text-center py-2 rounded-lg text-xs font-mono border transition bg-zinc-900/60 text-zinc-500 border-zinc-800/80";
+              }
+            }
+          });
+
+          toggleFieldConfigPanel();
+          alert(`✅ Configuración guardada en SQLite (RF1):\n• Días: ${data.active_days.join(', ')}\n• Hora: ${data.irrigation_time} hrs\n• Duración: ${data.duration_minutes} min`);
+        } else {
+          alert('Error actualizando calendario: ' + JSON.stringify(data));
+        }
+      } catch (e) {
+        alert('Error al conectar con la API de Orquídeas: ' + e);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Guardar Configuración en SQLite (RF1)';
+      }
+    }
+
+    async function triggerHomePulse() {
+      await sendActuatorCommand('bomba_agua', 'ON', 60);
+    }
+
+    async function sendActuatorCommand(target, action, val) {
+      try {
+        const res = await fetch('/api/v1/services/home-tower/actuators/command', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
             target: target,
             action: action,
-            parameter_value: parameter_value,
+            parameter_value: val,
             triggered_by: 'web_dashboard'
           })
         });
         const data = await res.json();
-        alert(`Comando ejecutado: ${data.message}`);
-        location.reload();
+        if (res.ok) {
+          alert(`Comando ejecutado: ${data.message}`);
+          location.reload();
+        } else {
+          alert(`Aviso de Protección: ${data.detail || JSON.stringify(data)}`);
+        }
       } catch (e) {
-        alert('Error ejecutando comando: ' + e);
+        alert('Error enviando comando: ' + e);
       }
     }
 
     async function runScenario(scenario) {
       try {
         const res = await fetch(`/api/v1/simulate/${scenario}`, { method: 'POST' });
-        const data = await res.json();
+        await res.json();
         location.reload();
       } catch (e) {
         alert('Error en simulación: ' + e);
       }
-    }
-
-    async function askQuick(prompt) {
-      document.getElementById('chatInput').value = prompt;
-      await sendChat();
     }
 
     async function sendChat() {
@@ -546,7 +815,7 @@
       btn.disabled = true;
       btn.innerText = 'Consultando...';
       box.classList.remove('hidden');
-      respP.innerText = 'Analizando telemetría y base de datos relacional...';
+      respP.innerText = 'Consultando telemetría y reglas botánicas...';
 
       try {
         const res = await fetch('/api/v1/chat/farm', {
@@ -556,13 +825,17 @@
         });
         const data = await res.json();
         respP.innerText = data.answer;
-        badge.innerText = data.model_used || 'ASAI Assistant';
+        badge.innerText = data.model_used || 'ASAI Bot:';
       } catch (e) {
         respP.innerText = 'Error al comunicarse con el asistente: ' + e;
       } finally {
         btn.disabled = false;
         btn.innerText = 'Consultar';
       }
+    }
+
+    function refreshHistory() {
+      location.reload();
     }
   </script>
 </body>

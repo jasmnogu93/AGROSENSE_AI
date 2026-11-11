@@ -60,6 +60,35 @@ Proveer la lógica de negocio y endpoints necesarios para cumplir **al 100% los 
 | :--- | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/services/field/status` | Estado actual del módulo de orquídeas y telemetría | Ninguno | Estado ambiental, perfil de orquídeas y alertas |
 | `GET` | `/api/v1/services/field/schedule` | Obtiene el calendario semanal de riego configurado (RF1) | Ninguno | Días activos, hora programada, próxima notificación |
-| `POST` | `/api/v1/services/field/schedule` | Guarda y actualiza días y horas de riego (RF1) | `{ "active_days": [...], "irrigation_time": "08:00", "duration_minutes": 20 }` | Calendario confirmado y mensaje de éxito |
-| `POST` | `/api/v1/services/field/telemetry` | Ingesta de lectura de sensores Wi-Fi (RF3, RF4) | `{ "air_temperature": 21.0, "air_humidity": 79.5, ... }` | Telemetría registrada en BD SQLite |
+| `POST` | `/api/v1/services/field/schedule` | Guarda y actualiza días y horas de riego (RF1) | `FieldScheduleUpdate` | Calendario confirmado o HTTP 400 si `active_days` está vacío |
+| `GET` | `/api/v1/services/field/notification` | Retorna próxima cita de riego calculada (RF2) | Ninguno | Día, hora, booleano `is_today` y mensaje |
+| `POST` | `/api/v1/services/field/telemetry` | Ingesta de lectura de sensores Wi-Fi (RF3, RF4) | `FieldTelemetryInput` | Telemetría registrada en `telemetria_historica` |
 | `GET` | `/api/v1/services/field/history` | Consulta histórica de datos ambientales (RF5) | Query param `?limit=10` | Lista de registros cronológicos |
+
+---
+
+## 4. Contratos JSON Exactos y Reglas de Persistencia
+* **`POST /api/v1/services/field/schedule` (`FieldScheduleUpdate`):**
+  * **Request:**
+    ```json
+    {
+      "active_days": ["Lun", "Mié", "Vie"],
+      "irrigation_time": "08:30",
+      "duration_minutes": 20
+    }
+    ```
+  * **Validaciones:** `duration_minutes` entre `1` y `120`; `active_days` no puede estar vacío (HTTP `400`). Valores válidos de días: `["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]`.
+  * **Response (`200 OK`):**
+    ```json
+    {
+      "status": "success",
+      "message": "Calendario de riego guardado en SQLite con éxito (RF1).",
+      "active_days": ["Lun", "Mié", "Vie"],
+      "irrigation_time": "08:30",
+      "duration_minutes": 20,
+      "notification": "🔔 Notificación de Riego (RF2): Próximo riego programado para ..."
+    }
+    ```
+* **`POST /api/v1/services/field/telemetry` (`FieldTelemetryInput`):**
+  * **Request:** `{ "air_temperature": 21.4, "air_humidity": 79.8, "soil_humidity_pct": 68.0 }` (`soil_humidity_pct` opcional).
+  * **Persistencia:** Tanto el calendario semanal (`calendario_semanal`) como el último estado operativo (`estado_modulo`) y la serie histórica (`telemetria_historica`) persisten en `backend/agrosense.db` mediante `backend/app/db.py`.

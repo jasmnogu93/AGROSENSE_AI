@@ -91,21 +91,75 @@ CREATE TABLE IF NOT EXISTS alertas_sistema (
     FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id)
 );
 
+-- 7. Tabla de Calendario Semanal de Riego (RF1 Integración II & Recirculación)
+CREATE TABLE IF NOT EXISTS calendario_semanal (
+    modulo_id VARCHAR(50) PRIMARY KEY,
+    dias_activos_json TEXT NOT NULL,           -- JSON list: ["Lun", "Mié", "Vie"]
+    hora_riego VARCHAR(10) NOT NULL DEFAULT '08:30',
+    duracion_minutos INTEGER NOT NULL DEFAULT 20,
+    intervalo_horas INTEGER NOT NULL DEFAULT 2,
+    actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id)
+);
+
+-- 8. Tabla de Estado Operativo Persistente por Módulo (Evita pérdida en RAM)
+CREATE TABLE IF NOT EXISTS estado_modulo (
+    modulo_id VARCHAR(50) PRIMARY KEY,
+    temp_ambiente REAL NOT NULL,
+    humedad_ambiente REAL NOT NULL,
+    presion_hpa REAL NOT NULL DEFAULT 1013.25,
+    nivel_estanque REAL NOT NULL DEFAULT 85.0,
+    dpv_kpa REAL,
+    bomba_encendida BOOLEAN DEFAULT 0,
+    servo_angulo INTEGER DEFAULT 0,
+    pasos_motor_acumulados INTEGER DEFAULT 0,
+    humedad_sustrato REAL,
+    actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id)
+);
+
 -- =============================================================================
--- INSERCIÓN DE DATOS INICIALES (SEED DATA)
+-- INSERCIÓN DE DATOS INICIALES (SEED DATA IDEMPOTENTE)
 -- =============================================================================
 
 INSERT OR IGNORE INTO modulos_hidroponicos (id, nombre, descripcion, broker_topic_telemetria, broker_topic_comandos)
 VALUES (
     'celda-01', 
-    'Bandeja Piloto 01', 
+    'Mini Torre Domiciliaria ASAI (Celda 01)', 
     'Prototipo hidropónico NFT de 1 nivel con ESP32, BME280, DHT11, Relé 5V, Servo SG90 y PaP ULN2003',
     'agrosense/telemetria/celda01',
     'agrosense/comandos/celda01'
 );
 
-INSERT OR IGNORE INTO perfiles_cultivo (especie, temp_min, temp_max, humedad_min, humedad_max, dpv_min_kpa, dpv_max_kpa, recirculacion_minutos, intervalo_riego_horas)
-VALUES ('Frutilla Hidropónica', 18.0, 24.0, 55.0, 75.0, 0.8, 1.2, 15, 2);
+INSERT OR IGNORE INTO modulos_hidroponicos (id, nombre, descripcion, broker_topic_telemetria, broker_topic_comandos)
+VALUES (
+    'invernadero-orquideas',
+    'Invernadero Orquídeas (Caso IEI-094)',
+    'Cultivo tradicional en invernadero con calendario semanal (80% HR y 18-24 °C)',
+    'agrosense/telemetria/orquideas01',
+    'agrosense/comandos/orquideas01'
+);
 
-INSERT OR IGNORE INTO asignacion_cultivo_modulo (modulo_id, perfil_id, estado_cultivo)
-VALUES ('celda-01', 1, 'FLORACION');
+INSERT INTO perfiles_cultivo (especie, temp_min, temp_max, humedad_min, humedad_max, dpv_min_kpa, dpv_max_kpa, recirculacion_minutos, intervalo_riego_horas)
+SELECT 'Frutilla Hidropónica', 18.0, 24.0, 55.0, 75.0, 0.8, 1.2, 15, 2
+WHERE NOT EXISTS (SELECT 1 FROM perfiles_cultivo WHERE especie = 'Frutilla Hidropónica');
+
+INSERT INTO perfiles_cultivo (especie, temp_min, temp_max, humedad_min, humedad_max, dpv_min_kpa, dpv_max_kpa, recirculacion_minutos, intervalo_riego_horas)
+SELECT 'Orquídeas de Invernadero (Phalaenopsis)', 18.0, 24.0, 75.0, 85.0, 0.5, 0.9, 20, 24
+WHERE NOT EXISTS (SELECT 1 FROM perfiles_cultivo WHERE especie = 'Orquídeas de Invernadero (Phalaenopsis)');
+
+INSERT INTO asignacion_cultivo_modulo (modulo_id, perfil_id, estado_cultivo)
+SELECT 'celda-01', 1, 'FLORACION'
+WHERE NOT EXISTS (SELECT 1 FROM asignacion_cultivo_modulo WHERE modulo_id = 'celda-01');
+
+INSERT OR IGNORE INTO calendario_semanal (modulo_id, dias_activos_json, hora_riego, duracion_minutos, intervalo_horas)
+VALUES ('invernadero-orquideas', '["Lun", "Mié", "Vie"]', '08:30', 20, 24);
+
+INSERT OR IGNORE INTO calendario_semanal (modulo_id, dias_activos_json, hora_riego, duracion_minutos, intervalo_horas)
+VALUES ('celda-01', '["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]', '08:00', 15, 2);
+
+INSERT OR IGNORE INTO estado_modulo (modulo_id, temp_ambiente, humedad_ambiente, presion_hpa, nivel_estanque, dpv_kpa, bomba_encendida, servo_angulo, pasos_motor_acumulados)
+VALUES ('celda-01', 21.8, 62.4, 1014.5, 85.0, 0.98, 0, 0, 0);
+
+INSERT OR IGNORE INTO estado_modulo (modulo_id, temp_ambiente, humedad_ambiente, presion_hpa, nivel_estanque, dpv_kpa, bomba_encendida, servo_angulo, pasos_motor_acumulados, humedad_sustrato)
+VALUES ('invernadero-orquideas', 21.4, 79.8, 1013.8, 90.0, 0.51, 0, 0, 0, 68.0);

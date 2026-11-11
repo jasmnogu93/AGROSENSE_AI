@@ -1,14 +1,13 @@
 import os
-import sqlite3
-import math
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import httpx
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app import db
 from app.config import settings
 from app.models import (
     PlantProfile,
@@ -20,102 +19,27 @@ from app.models import (
     FarmChatResponse,
     HealthStatus
 )
+from app.routers import field_service, home_tower_service, vertical_farm_service
 
 app = FastAPI(
-    title="AgroSense AI — Core Management Hub (SOA)",
-    description="Microservicio Hub para Ingesta IoT (ESP32), Persistencia SQLite, Orquestación JEV, Control de Actuadores y Asistente Agronómico",
-    version="2.1.0"
+    title="AgroSense AI — Core Management Hub (SOA Tri-Servicio)",
+    description="Hub SOA para: 1. AgroField (Orquídeas IEI-094), 2. HomeTower (Mini Torres Feria Innovación & Android), 3. VerticalFarm (Invernaderos Industriales)",
+    version="2.2.0"
 )
 
-# Configuración de templates HTML y Base de Datos SQLite
+# Montaje de Routers de Servicios Desacoplados (SOA)
+app.include_router(field_service.router, prefix="/api/v1/services/field", tags=["1. AgroField Service (Integración II - Orquídeas)"])
+app.include_router(home_tower_service.router, prefix="/api/v1/services/home-tower", tags=["2. HomeTower Service (Feria Innovación - Mini Torre)"])
+app.include_router(vertical_farm_service.router, prefix="/api/v1/services/vertical-farm", tags=["3. VerticalFarm Service (Invernaderos Industriales)"])
+
+# Configuración de templates HTML y Base de Datos SQLite compartida
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=templates_dir)
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "agrosense.db")
-
-# ==============================================================================
-# INICIALIZACIÓN Y PERSISTENCIA EN BASE DE DATOS SQLITE
-# ==============================================================================
-
-def init_db():
-    """Crea las tablas a partir de database_schema.sql e inserta datos iniciales si está vacía."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    schema_path = os.path.join(os.path.dirname(__file__), "database_schema.sql")
-    if os.path.exists(schema_path):
-        with open(schema_path, "r", encoding="utf-8") as f:
-            cursor.executescript(f.read())
-    
-    # Verificar si hay datos históricos; si no, insertar lecturas iniciales de prueba
-    cursor.execute("SELECT COUNT(*) FROM telemetria_historica")
-    count = cursor.fetchone()[0]
-    if count == 0:
-        ahora = datetime.utcnow()
-        seed_data = [
-            ("celda-01", (ahora - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S"), 21.2, 64.0, 1014.0, 0.92, 88.0, 0, 0, 0),
-            ("celda-01", (ahora - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"), 21.6, 63.1, 1014.2, 0.95, 86.5, 1, 0, 0),
-            ("celda-01", ahora.strftime("%Y-%m-%d %H:%M:%S"), 21.8, 62.4, 1014.5, 0.98, 85.0, 0, 0, 0),
-        ]
-        cursor.executemany("""
-            INSERT INTO telemetria_historica (
-                modulo_id, fecha_hora, temp_ambiente, humedad_ambiente, presion_atmosferica,
-                dpv_kpa, nivel_estanque, bomba_encendida, servo_angulo, pasos_motor_acumulados
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, seed_data)
-        conn.commit()
-
-    conn.close()
-
-# Inicializar BD al arrancar
-init_db()
-
-def save_telemetry_to_db(t: TelemetryInput):
-    """Guarda cada lectura física emitida por el ESP32 en la base de datos relacional."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO telemetria_historica (
-            modulo_id, temp_ambiente, humedad_ambiente, presion_atmosferica,
-            dpv_kpa, nivel_estanque, bomba_encendida, servo_angulo, pasos_motor_acumulados
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        t.module_id, t.air_temperature, t.air_humidity, t.barometric_pressure_hpa,
-        t.vpd_kpa, t.reservoir_level_percent, 1 if t.pump_active else 0,
-        t.vent_servo_angle, t.stepper_dosing_steps
-    ))
-    conn.commit()
-    conn.close()
-
-def save_command_to_db(cmd: ActuatorCommand):
-    """Guarda en auditoría cada orden ejecutada sobre los actuadores."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO registro_comandos (
-            modulo_id, actuador, accion, parametro_valor, disparado_por
-        ) VALUES (?, ?, ?, ?, ?)
-    """, (cmd.module_id, cmd.target, cmd.action, cmd.parameter_value, cmd.triggered_by))
-    conn.commit()
-    conn.close()
-
-def get_recent_history(limit: int = 8) -> List[Dict[str, Any]]:
-    """Obtiene las últimas mediciones para mostrar en el dashboard web y la app móvil."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, fecha_hora, temp_ambiente, humedad_ambiente, presion_atmosferica,
-               dpv_kpa, nivel_estanque, bomba_encendida, servo_angulo
-        FROM telemetria_historica
-        ORDER BY id DESC
-        LIMIT ?
-    """, (limit,))
-    rows = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return rows
+db.init_db()
 
 
 # ==============================================================================
-# ESTADO EN MEMORIA Y MODELOS DE BANDEJA
+# HELPERS DE ESTADO PERSISTENTE Y MODELOS DE BANDEJA
 # ==============================================================================
 
 current_plant_profile = PlantProfile(
@@ -135,38 +59,67 @@ current_plant_profile = PlantProfile(
 
 current_module = HydroponicModule(
     id="celda-01",
-    name="Bandeja Hidropónica Piloto - Frutilla",
+    name="Mini Torre Domiciliaria ASAI (Celda 01)",
     location="Santo Tomás Temuco - Laboratorio IoT",
     plant_profile_id=current_plant_profile.id,
     growth_stage="FLORACION",
     active=True
 )
 
-latest_telemetry = TelemetryInput(
-    module_id=current_module.id,
-    air_temperature=21.8,
-    air_humidity=62.4,
-    barometric_pressure_hpa=1014.5,
-    reservoir_level_percent=85.0,
-    vpd_kpa=0.98,
-    pump_active=False,
-    vent_servo_angle=0,
-    stepper_dosing_steps=0
-)
-
 recent_commands: List[ActuatorCommand] = []
+
+
+def _get_live_telemetry() -> TelemetryInput:
+    """Construye TelemetryInput desde el estado persistente en SQLite."""
+    state = db.load_module_state(current_module.id)
+    return TelemetryInput(
+        module_id=current_module.id,
+        air_temperature=state["air_temperature"],
+        air_humidity=state["air_humidity"],
+        barometric_pressure_hpa=state["barometric_pressure_hpa"],
+        reservoir_level_percent=state["reservoir_level_percent"],
+        vpd_kpa=state["vpd_kpa"],
+        pump_active=state["pump_active"],
+        vent_servo_angle=state["vent_servo_angle"],
+        stepper_dosing_steps=state["stepper_dosing_steps"],
+    )
+
+
+def _get_live_profile() -> PlantProfile:
+    """Sincroniza el perfil de cultivo con la configuración persistida en SQLite."""
+    sched = db.load_schedule(current_module.id)
+    current_plant_profile.recirculation_interval_hours = sched["interval_hours"]
+    current_plant_profile.recirculation_cycle_minutes = sched["duration_minutes"]
+    return current_plant_profile
+
+
+def _build_schedule_summary(telemetry: TelemetryInput) -> Dict[str, Any]:
+    """Calcula resumen semanal y próximo ciclo desde calendario_semanal en SQLite."""
+    sched = db.load_schedule(current_module.id)
+    hoy_str = db.get_today_es()
+    active_days = sched["active_days"] or ["Lun"]
+    prox_dia = hoy_str if hoy_str in active_days else active_days[0]
+    next_cycle = datetime.now() + timedelta(hours=sched["interval_hours"])
+    return {
+        "interval_hours": sched["interval_hours"],
+        "duration_minutes": sched["duration_minutes"],
+        "active_days": active_days,
+        "dias_semana": sched["dias_semana"],
+        "today_str": hoy_str,
+        "irrigation_time": sched["irrigation_time"],
+        "next_cycle_time": next_cycle.strftime("%H:%M:%S"),
+        "next_cycle_full": next_cycle.strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "BOMBEANDO" if telemetry.pump_active else "EN_ESPERA",
+        "notification": (
+            f"Próximo riego programado para {prox_dia} a las {sched['irrigation_time']} hrs "
+            f"({sched['duration_minutes']} min). Días activos: {', '.join(active_days)}."
+        ),
+    }
 
 
 # ==============================================================================
 # MOTOR DETERMINISTA DE RESPALDO (LOCAL FALLBACK - CIBERFÍSICO)
 # ==============================================================================
-
-def calculate_vpd(temp_c: float, rh_pct: float) -> float:
-    """Fórmula de Tetens para el Déficit de Presión de Vapor (DPV) en kPa."""
-    svp = 0.61078 * math.exp((17.27 * temp_c) / (temp_c + 237.3))
-    avp = svp * (rh_pct / 100.0)
-    return round(svp - avp, 2)
-
 
 def evaluate_jev_local(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisionResponse:
     # 1. Regla Crítica: Protección contra cavitación
@@ -182,7 +135,7 @@ def evaluate_jev_local(telemetry: TelemetryInput, profile: PlantProfile) -> JevD
         )
 
     # 2. Regla Térmica: Ventilación Cenital Servo SG90
-    dpv = telemetry.vpd_kpa or calculate_vpd(telemetry.air_temperature, telemetry.air_humidity)
+    dpv = telemetry.vpd_kpa or db.calculate_vpd(telemetry.air_temperature, telemetry.air_humidity)
     if telemetry.air_temperature > profile.optimal_temp_max_c or dpv > profile.optimal_vpd_max_kpa:
         return JevDecisionResponse(
             action_required=True,
@@ -260,7 +213,12 @@ async def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevD
     return fallback
 
 
-latest_jev_decision = evaluate_jev_local(latest_telemetry, current_plant_profile)
+SCENARIO_PRESETS: Dict[str, Dict[str, Any]] = {
+    "estanque_vacio": {"reservoir_level_percent": 12.0, "pump_active": False},
+    "calor_extremo": {"air_temperature": 28.5, "air_humidity": 42.0},
+    "optimo": {"reservoir_level_percent": 85.0, "air_temperature": 21.5, "air_humidity": 62.0, "vpd_kpa": 0.95, "vent_servo_angle": 0},
+    "recirculacion": {"reservoir_level_percent": 80.0, "pump_active": True},
+}
 
 
 # ==============================================================================
@@ -270,32 +228,31 @@ latest_jev_decision = evaluate_jev_local(latest_telemetry, current_plant_profile
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """
-    Sirve el Dashboard Web interactivo de la Celda Hidropónica Piloto 01
-    incluyendo el Calendario de Riego y el Histórico de la Base de Datos.
+    Sirve el Dashboard Web interactivo y adaptativo de AgroSense AI (SOA Tri-Servicio):
+    1. AgroField Service (Invernadero & Orquídeas - Integración II)
+    2. HomeTower Service (Mini Torres Domiciliarias - Feria de Innovación & Android)
+    3. VerticalFarm Service (Invernaderos Industriales)
     """
-    history_records = get_recent_history(limit=8)
-    
-    # Calcular próximo ciclo de riego
-    next_cycle = datetime.now() + timedelta(hours=current_plant_profile.recirculation_interval_hours)
-    schedule_data = {
-        "interval_hours": current_plant_profile.recirculation_interval_hours,
-        "duration_minutes": current_plant_profile.recirculation_cycle_minutes,
-        "next_cycle_time": next_cycle.strftime("%H:%M:%S"),
-        "status": "BOMBEANDO" if latest_telemetry.pump_active else "EN_ESPERA",
-        "notification": "Riego programado activo: 15 min cada 2 horas."
-    }
+    live_tel = _get_live_telemetry()
+    live_prof = _get_live_profile()
+    live_jev = evaluate_jev_local(live_tel, live_prof)
 
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "module": current_module,
-            "plant": current_plant_profile,
-            "telemetry": latest_telemetry,
-            "jev": latest_jev_decision,
-            "schedule": schedule_data,
-            "history": history_records,
+            "plant": live_prof,
+            "telemetry": live_tel,
+            "jev": live_jev,
+            "schedule": _build_schedule_summary(live_tel),
+            "history": db.get_telemetry_history(limit=8),
             "recent_commands": recent_commands[-5:],
+            "field_data": field_service.get_field_dashboard_data(),
+            "home_tower_data": home_tower_service.get_home_tower_dashboard_data(),
+            "vertical_farm_data": {
+                "racks": vertical_farm_service.INDUSTRIAL_RACKS
+            },
             "now": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
     )
@@ -315,56 +272,67 @@ async def ingest_telemetry(telemetry: TelemetryInput):
     """
     Ingesta de telemetría IoT desde el ESP32:
     1. Calcula DPV si no viene incluido.
-    2. Guarda permanentemente en la base de datos SQLite (Histórico).
+    2. Actualiza estado operativo persistente y guarda en telemetria_historica (SQLite).
     3. Evalúa reglas ciberfísicas de JEV.
     """
-    global latest_telemetry, latest_jev_decision
     if not telemetry.vpd_kpa:
-        telemetry.vpd_kpa = calculate_vpd(telemetry.air_temperature, telemetry.air_humidity)
-    
-    latest_telemetry = telemetry
-    
-    # PERSISTENCIA EN SQLITE
-    save_telemetry_to_db(latest_telemetry)
-    
-    latest_jev_decision = await evaluate_jev(latest_telemetry, current_plant_profile)
+        telemetry.vpd_kpa = db.calculate_vpd(telemetry.air_temperature, telemetry.air_humidity)
+
+    db.save_module_state(
+        telemetry.module_id,
+        air_temperature=telemetry.air_temperature,
+        air_humidity=telemetry.air_humidity,
+        barometric_pressure_hpa=telemetry.barometric_pressure_hpa,
+        reservoir_level_percent=telemetry.reservoir_level_percent,
+        vpd_kpa=telemetry.vpd_kpa,
+        pump_active=telemetry.pump_active,
+        vent_servo_angle=telemetry.vent_servo_angle,
+        stepper_dosing_steps=telemetry.stepper_dosing_steps,
+    )
+    db.insert_telemetry(
+        module_id=telemetry.module_id,
+        temp=telemetry.air_temperature,
+        humidity=telemetry.air_humidity,
+        pressure=telemetry.barometric_pressure_hpa,
+        vpd=telemetry.vpd_kpa,
+        level=telemetry.reservoir_level_percent,
+        pump_active=telemetry.pump_active,
+        servo_angle=telemetry.vent_servo_angle,
+        steps=telemetry.stepper_dosing_steps,
+        origen="REST_ESP32",
+    )
+
+    jev_decision = await evaluate_jev(telemetry, _get_live_profile())
     return {
         "status": "success",
         "message": "Telemetría guardada en SQLite e inferencia evaluada con éxito",
-        "telemetry": latest_telemetry,
-        "jev_decision": latest_jev_decision
+        "telemetry": telemetry,
+        "jev_decision": jev_decision
     }
 
 
 @app.get("/api/v1/telemetry/latest", response_model=TelemetryInput)
 async def get_latest_telemetry():
-    return latest_telemetry
+    return _get_live_telemetry()
 
 
 @app.get("/api/v1/telemetry/history")
 async def get_telemetry_history(limit: int = 20):
     """Retorna las lecturas históricas guardadas en la base de datos relacional."""
-    return get_recent_history(limit=limit)
+    return db.get_telemetry_history(limit=limit)
 
 
 @app.post("/api/v1/actuators/command", response_model=Dict[str, Any])
 async def send_actuator_command(cmd: ActuatorCommand):
-    global latest_telemetry, recent_commands
     recent_commands.append(cmd)
-    
-    # GUARDAR AUDITORÍA DE COMANDOS EN SQLITE
-    save_command_to_db(cmd)
-
-    if cmd.target == "bomba_agua":
-        latest_telemetry.pump_active = (cmd.action.upper() == "ON")
-    elif cmd.target == "servo_ventilacion":
-        latest_telemetry.vent_servo_angle = int(cmd.parameter_value or 0)
-    elif cmd.target == "motor_nutrientes":
-        latest_telemetry.stepper_dosing_steps += int(cmd.parameter_value or 0)
-
-    # Actualizar BD con el nuevo estado del actuador
-    save_telemetry_to_db(latest_telemetry)
-
+    home_tower_service.apply_actuator_command_persistent(
+        module_id=cmd.module_id or current_module.id,
+        target=cmd.target,
+        action=cmd.action,
+        parameter_value=cmd.parameter_value,
+        triggered_by=cmd.triggered_by,
+        enforce_cavitation_lock=True,
+    )
     return {
         "status": "command_registered",
         "actuator": cmd.target,
@@ -376,22 +344,27 @@ async def send_actuator_command(cmd: ActuatorCommand):
 
 
 class ScheduleUpdateRequest(BaseModel):
-    interval_hours: int = Field(..., ge=1, le=24, description="Frecuencia en horas entre ciclos")
-    duration_minutes: int = Field(..., ge=1, le=120, description="Duración de bombeo en minutos")
+    interval_hours: int = Field(default=2, ge=1, le=24, description="Frecuencia en horas entre ciclos")
+    duration_minutes: int = Field(default=15, ge=1, le=120, description="Duración de bombeo en minutos")
+    active_days: Optional[List[str]] = Field(default=None, description="Días activos de la semana (RF1)")
+    irrigation_time: Optional[str] = Field(default=None, description="Hora de riego programada (RF1)")
 
 
 @app.get("/api/v1/schedule", response_model=Dict[str, Any])
 async def get_schedule():
-    """Endpoint de calendario de recirculación (Requerimiento Semana 13 Integración II)."""
-    next_cycle = datetime.now() + timedelta(hours=current_plant_profile.recirculation_interval_hours)
+    """Endpoint de calendario de recirculación persistente (Cumple RF1 y RF2 IEI-094)."""
+    live_tel = _get_live_telemetry()
+    summary = _build_schedule_summary(live_tel)
     return {
         "module_id": current_module.id,
         "crop": current_plant_profile.species_name,
-        "recirculation_duration_minutes": current_plant_profile.recirculation_cycle_minutes,
-        "interval_hours": current_plant_profile.recirculation_interval_hours,
-        "next_cycle": next_cycle.strftime("%Y-%m-%d %H:%M:%S"),
-        "pump_status": "ACTIVA" if latest_telemetry.pump_active else "EN_ESPERA",
-        "notification_message": f"Próximo ciclo programado a las {next_cycle.strftime('%H:%M:%S')} ({current_plant_profile.recirculation_cycle_minutes} min)"
+        "active_days": summary["active_days"],
+        "irrigation_time": summary["irrigation_time"],
+        "recirculation_duration_minutes": summary["duration_minutes"],
+        "interval_hours": summary["interval_hours"],
+        "next_cycle": summary["next_cycle_full"],
+        "pump_status": "ACTIVA" if live_tel.pump_active else "EN_ESPERA",
+        "notification_message": summary["notification"],
     }
 
 
@@ -399,90 +372,92 @@ async def get_schedule():
 async def update_schedule(data: ScheduleUpdateRequest):
     """
     Actualiza la configuración del calendario de riego/recirculación:
-    Modifica la frecuencia (horas) y duración (minutos) en memoria y en la base de datos SQLite.
+    Persiste en SQLite (calendario_semanal y perfiles_cultivo).
     """
-    global current_plant_profile
-    current_plant_profile.recirculation_interval_hours = data.interval_hours
-    current_plant_profile.recirculation_cycle_minutes = data.duration_minutes
-
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE perfiles_cultivo 
-            SET intervalo_riego_horas = ?, recirculacion_minutos = ?
-            WHERE id = 1
-        """, (data.interval_hours, data.duration_minutes))
+    db.save_schedule(
+        current_module.id,
+        active_days=data.active_days,
+        irrigation_time=data.irrigation_time,
+        duration_minutes=data.duration_minutes,
+        interval_hours=data.interval_hours,
+    )
+    with db.get_connection() as conn:
+        conn.execute(
+            "UPDATE perfiles_cultivo SET intervalo_riego_horas = ?, recirculacion_minutos = ? WHERE id = 1",
+            (data.interval_hours, data.duration_minutes),
+        )
         conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Error actualizando horario en SQLite: {e}")
 
-    next_cycle = datetime.now() + timedelta(hours=data.interval_hours)
+    summary = _build_schedule_summary(_get_live_telemetry())
     return {
         "status": "success",
-        "message": f"Calendario actualizado: cada {data.interval_hours}h por {data.duration_minutes} min.",
-        "interval_hours": data.interval_hours,
-        "duration_minutes": data.duration_minutes,
-        "next_cycle_time": next_cycle.strftime("%H:%M:%S")
+        "message": (
+            f"Calendario guardado en BD: Días [{', '.join(summary['active_days'])}] a las "
+            f"{summary['irrigation_time']} hrs (Ciclo cada {data.interval_hours}h por {data.duration_minutes} min)."
+        ),
+        "interval_hours": summary["interval_hours"],
+        "duration_minutes": summary["duration_minutes"],
+        "active_days": summary["active_days"],
+        "irrigation_time": summary["irrigation_time"],
+        "notification": summary["notification"],
     }
 
 
 @app.post("/api/v1/simulate/{scenario}")
 async def simulate_scenario(scenario: str):
-    global latest_telemetry, latest_jev_decision
-
-    if scenario == "estanque_vacio":
-        latest_telemetry.reservoir_level_percent = 12.0
-        latest_telemetry.pump_active = False
-    elif scenario == "calor_extremo":
-        latest_telemetry.air_temperature = 28.5
-        latest_telemetry.air_humidity = 42.0
-        latest_telemetry.vpd_kpa = calculate_vpd(28.5, 42.0)
-    elif scenario == "optimo":
-        latest_telemetry.reservoir_level_percent = 85.0
-        latest_telemetry.air_temperature = 21.5
-        latest_telemetry.air_humidity = 62.0
-        latest_telemetry.vpd_kpa = 0.95
-        latest_telemetry.vent_servo_angle = 0
-    elif scenario == "recirculacion":
-        latest_telemetry.reservoir_level_percent = 80.0
-        latest_telemetry.pump_active = True
-    else:
+    preset = SCENARIO_PRESETS.get(scenario)
+    if preset is None:
         raise HTTPException(status_code=400, detail="Escenario no reconocido.")
 
-    save_telemetry_to_db(latest_telemetry)
-    latest_jev_decision = await evaluate_jev(latest_telemetry, current_plant_profile)
+    updated = db.save_module_state(current_module.id, **preset)
+    db.insert_telemetry(
+        module_id=current_module.id,
+        temp=updated["air_temperature"],
+        humidity=updated["air_humidity"],
+        pressure=updated["barometric_pressure_hpa"],
+        vpd=updated["vpd_kpa"],
+        level=updated["reservoir_level_percent"],
+        pump_active=updated["pump_active"],
+        servo_angle=updated["vent_servo_angle"],
+        steps=updated["stepper_dosing_steps"],
+        origen=f"SIMULACION_{scenario.upper()}",
+    )
+
+    live_tel = _get_live_telemetry()
+    jev_decision = await evaluate_jev(live_tel, _get_live_profile())
     return {
         "scenario": scenario,
-        "telemetry": latest_telemetry,
-        "jev_decision": latest_jev_decision
+        "telemetry": live_tel,
+        "jev_decision": jev_decision,
     }
 
 
 @app.post("/api/v1/chat/farm", response_model=FarmChatResponse)
 async def chat_with_farm(request: FarmChatRequest):
     tools_used = ["DHT11", "BME280", "SensorNivelResistivo", "SQLiteHistory", "JevDecisionLog"]
+    live_tel = _get_live_telemetry()
+    live_prof = _get_live_profile()
+    live_jev = evaluate_jev_local(live_tel, live_prof)
 
     system_prompt = f"""Eres el Asistente Agronómico Inteligente de la plataforma 'AgroSense AI'.
 Estás a cargo de la celda hidropónica piloto '{current_module.name}'.
 Responde de forma profesional, concisa, técnica y empática basándote en los datos reales del hardware y la base de datos.
 
 DATOS DE LA BANDEJA HIDROPÓNICA:
-- Cultivo: {current_plant_profile.species_name} ({current_plant_profile.variety})
-- Rango óptimo Temp: {current_plant_profile.optimal_temp_min_c}°C a {current_plant_profile.optimal_temp_max_c}°C
-- Rango óptimo Humedad: {current_plant_profile.optimal_humidity_min}% a {current_plant_profile.optimal_humidity_max}%
-- DPV óptimo: {current_plant_profile.optimal_vpd_min_kpa} a {current_plant_profile.optimal_vpd_max_kpa} kPa
+- Cultivo: {live_prof.species_name} ({live_prof.variety})
+- Rango óptimo Temp: {live_prof.optimal_temp_min_c}°C a {live_prof.optimal_temp_max_c}°C
+- Rango óptimo Humedad: {live_prof.optimal_humidity_min}% a {live_prof.optimal_humidity_max}%
+- DPV óptimo: {live_prof.optimal_vpd_min_kpa} a {live_prof.optimal_vpd_max_kpa} kPa
 
 MEDICIONES REALES EN TIEMPO REAL:
-- Temp ambiental: {latest_telemetry.air_temperature} °C
-- Humedad aérea: {latest_telemetry.air_humidity} %
-- Presión barométrica: {latest_telemetry.barometric_pressure_hpa} hPa
-- DPV: {latest_telemetry.vpd_kpa} kPa
-- Nivel de estanque: {latest_telemetry.reservoir_level_percent} %
-- Bomba 5V: {'ENCENDIDA' if latest_telemetry.pump_active else 'APAGADA'}
-- Servo Cenital: {latest_telemetry.vent_servo_angle}°
-- Decisión JEV: {latest_jev_decision.reason}
+- Temp ambiental: {live_tel.air_temperature} °C
+- Humedad aérea: {live_tel.air_humidity} %
+- Presión barométrica: {live_tel.barometric_pressure_hpa} hPa
+- DPV: {live_tel.vpd_kpa} kPa
+- Nivel de estanque: {live_tel.reservoir_level_percent} %
+- Bomba 5V: {'ENCENDIDA' if live_tel.pump_active else 'APAGADA'}
+- Servo Cenital: {live_tel.vent_servo_angle}°
+- Decisión JEV: {live_jev.reason}
 """
 
     api_key = settings.LLM_API_KEY.strip()
@@ -525,24 +500,24 @@ MEDICIONES REALES EN TIEMPO REAL:
 
     # Respuesta Heurística Local
     q = request.question.lower()
-    if "bomba" in q or "riego" in q or "estanque" in q or "calendario" in q:
+    if any(k in q for k in ("bomba", "riego", "estanque", "calendario")):
         answer = (
-            f"El estanque reporta un nivel del {latest_telemetry.reservoir_level_percent:.1f}%. "
-            f"La mini-bomba sumergible de 5V se encuentra {'ENCENDIDA recirculando' if latest_telemetry.pump_active else 'APAGADA en ciclo de espera'}. "
-            f"Programación: ciclos de {current_plant_profile.recirculation_cycle_minutes} min cada {current_plant_profile.recirculation_interval_hours} horas. "
-            f"Evaluación JEV: {latest_jev_decision.reason}"
+            f"El estanque reporta un nivel del {live_tel.reservoir_level_percent:.1f}%. "
+            f"La mini-bomba sumergible de 5V se encuentra {'ENCENDIDA recirculando' if live_tel.pump_active else 'APAGADA en ciclo de espera'}. "
+            f"Programación: ciclos de {live_prof.recirculation_cycle_minutes} min cada {live_prof.recirculation_interval_hours} horas. "
+            f"Evaluación JEV: {live_jev.reason}"
         )
-    elif "temperatura" in q or "humedad" in q or "clima" in q or "dpv" in q:
+    elif any(k in q for k in ("temperatura", "humedad", "clima", "dpv")):
         answer = (
-            f"Temperatura ambiental: {latest_telemetry.air_temperature:.1f}°C, humedad: {latest_telemetry.air_humidity:.1f}%. "
-            f"El Déficit de Presión de Vapor (DPV) es {latest_telemetry.vpd_kpa:.2f} kPa. "
-            f"Ventilación cenital servo a {latest_telemetry.vent_servo_angle}°."
+            f"Temperatura ambiental: {live_tel.air_temperature:.1f}°C, humedad: {live_tel.air_humidity:.1f}%. "
+            f"El Déficit de Presión de Vapor (DPV) es {live_tel.vpd_kpa:.2f} kPa. "
+            f"Ventilación cenital servo a {live_tel.vent_servo_angle}°."
         )
     else:
         answer = (
-            f"Hola, soy el asistente de la Celda Hidropónica Piloto 01 ({current_plant_profile.species_name}). "
-            f"Estado {latest_jev_decision.risk_level}: Temp {latest_telemetry.air_temperature:.1f}°C, "
-            f"Humedad {latest_telemetry.air_humidity:.1f}%, Estanque al {latest_telemetry.reservoir_level_percent:.1f}%. "
+            f"Hola, soy el asistente de la Celda Hidropónica Piloto 01 ({live_prof.species_name}). "
+            f"Estado {live_jev.risk_level}: Temp {live_tel.air_temperature:.1f}°C, "
+            f"Humedad {live_tel.air_humidity:.1f}%, Estanque al {live_tel.reservoir_level_percent:.1f}%. "
             f"Cada lectura se está guardando activamente en la base de datos relacional SQLite."
         )
 

@@ -28,6 +28,6 @@ class Settings:
     JEV_DEVICE_AUTH_TOKEN: str = os.getenv("JEV_DEVICE_AUTH_TOKEN", "default_secret_token")
     
     # Base de Datos
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./app/agrosense.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./agrosense.db")
 
 settings = Settings()
