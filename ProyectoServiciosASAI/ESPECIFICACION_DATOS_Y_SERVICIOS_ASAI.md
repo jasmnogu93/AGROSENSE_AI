@@ -27,10 +27,11 @@ flowchart LR
         TOPIC_ALERT["agrosense/alertas/celda01"]
     end
 
-    subgraph S2 ["Servicio 2: Backend Cloud Hub (FastAPI)"]
-        API["REST Endpoints (/api/v1/...)"]
-        RULES["Reglas Deterministas Fallback"]
-        DB[(Base de Datos SQL DDL)]
+    subgraph S2 ["Servicio 2: Backend Cloud Hub (FastAPI - Tri-Servicio)"]
+        S2A["2A. AgroField Service (/services/field)<br/>[Orquídeas - Calendario Semanal RF1-RF7]"]
+        S2B["2B. HomeTower Service (/services/home-tower)<br/>[Mini Torre Domiciliaria - Feria Innovación]"]
+        S2C["2C. VerticalFarm Service (/services/vertical-farm)<br/>[Invernadero Industrial a Escala]"]
+        DB[(Base de Datos SQLite/PostgreSQL)]
     end
 
     subgraph S3A ["Servicio 3A: Dashboard Web"]

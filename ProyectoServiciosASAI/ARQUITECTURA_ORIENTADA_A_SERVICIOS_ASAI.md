@@ -14,8 +14,11 @@ En la versión inicial del proyecto, el código del backend mezclaba en un mismo
 Para responder a las exigencias simultáneas de **Internet de las Cosas (IEI-059)**, **Programación Android (IEI-058)** e **Integración de Competencias II (IEI-094)**, desacoplamos el sistema bajo una **Arquitectura Orientada a Servicios (SOA)**.
 
 ### Principios Rectores del Nuevo Diseño:
-1. **Responsabilidad Única:** Cada servicio resuelve un problema específico (hardware, datos, interfaz o razonamiento).
-2. **Desacoplamiento Tecnológico:** El hardware habla MQTT sin saber qué base de datos existe; la app Android consume endpoints REST sin saber qué microcontrolador está conectado.
+1. **Responsabilidad Única y Dominios Delimitados:** Tres servicios de dominio especializados:
+   * **Servicio 1: AgroField Service (Campos e Invernadero Tradicional):** Diseñado específicamente para el caso de estudio de la empresa de orquídeas de *Integración de Competencias II* (RF1 a RF7), basado en calendario semanal (días L-D y horarios fijos) y notificaciones de riego.
+   * **Servicio 2: HomeTower Service (Mini Torres Domiciliarias):** Diseñado como producto comercial de agricultura urbana para la *Feria de Innovación Santo Tomás* y *Programación Android*, con recirculación periódica continua, protección de bomba contra cavitación, ventilación cenital por servo y dosificación de nutrientes.
+   * **Servicio 3: VerticalFarm Service (Invernaderos Verticales Industriales):** Diseñado como modelo de escalabilidad empresarial para naves industriales multi-torre con optimización bio-climática e inferencia en la nube.
+2. **Desacoplamiento Tecnológico:** El hardware habla MQTT/HTTP sin acoplarse a la base de datos; la app Android y la web consumen endpoints REST desacoplados.
 3. **Servicios de IA Enchufables (*Plug-and-Play*):** Las IAs (**TypeSafe Jev** y **DeepSeek**) no son obligatorias para el funcionamiento básico del sistema. Si hay internet y claves activas, elevan el sistema a un nivel superior; si se desconectan, el núcleo opera con reglas deterministas locales seguras.
 
 ---
