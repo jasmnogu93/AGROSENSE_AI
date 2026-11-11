@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AgroSense AI — Cloud Management Hub (Azure)</title>
+  <title>AgroSense AI — Celda Hidropónica Piloto (SOA Hub)</title>
   <!-- Google Fonts & Tailwind CSS CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,24 +48,24 @@
   <header class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between glass rounded-2xl p-4 md:px-6 mb-8 gap-4 shadow-2xl">
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center font-black text-xl text-black shadow-lg shadow-emerald-500/20">
-        🌱
+        🍓
       </div>
       <div>
         <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-          AgroSense AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">v1.0 Cloud</span>
+          AgroSense AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">MVP Hidropónico v2.1</span>
         </h1>
-        <p class="text-xs text-gray-400">Microservicio de Ingesta, Orquestación JEV y Asistencia Agronómica</p>
+        <p class="text-xs text-gray-400">Hub Central SOA: ESP32 + BME280 + DHT11 + Bomba 5V + Servo SG90 + PaP</p>
       </div>
     </div>
 
-    <!-- Cloud Status Badge -->
+    <!-- Status Badges -->
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 text-xs">
         <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
-        <span class="text-gray-300 font-mono">Azure Container Instances</span>
+        <span class="text-gray-300 font-mono">ESP32 DevKit V1 (Online)</span>
       </div>
       <a href="/docs" target="_blank" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs transition shadow-lg shadow-emerald-500/20">
-        API Docs (Swagger) &rarr;
+        API Swagger &rarr;
       </a>
     </div>
   </header>
@@ -73,283 +73,321 @@
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto space-y-8">
 
-    <!-- Grid 1: Sector & Botánica + JEV Engine Status -->
+    <!-- Grid 1: Celda Hidropónica & JEV Decision Engine -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-      <!-- Sector & Plant Profile Card -->
+      <!-- Módulo & Perfil de Cultivo -->
       <div class="glass rounded-2xl p-6 lg:col-span-1 flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between mb-4">
-            <span class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">Cuartel Activo</span>
-            <span class="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">{{ sector.growth_stage }}</span>
+            <span class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">Unidad Celular Activa</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">{{ module.growth_stage }}</span>
           </div>
-          <h2 class="text-2xl font-black text-white mb-1">{{ sector.name }}</h2>
-          <p class="text-sm text-gray-400 mb-4">{{ plant.common_name }} (<em>{{ plant.scientific_name }}</em> - {{ plant.variety }})</p>
+          <h2 class="text-2xl font-black text-white mb-1">{{ module.name }}</h2>
+          <p class="text-sm text-gray-400 mb-4">{{ plant.species_name }} (<em>{{ plant.variety }}</em>)</p>
 
           <div class="space-y-3 text-xs bg-slate-900/60 p-4 rounded-xl border border-slate-800">
             <div class="flex justify-between">
-              <span class="text-gray-400">Suelo:</span>
-              <span class="font-medium text-gray-200">{{ sector.soil_type }} ({{ sector.area_hectares }} ha)</span>
+              <span class="text-gray-400">Ubicación:</span>
+              <span class="font-medium text-gray-200">{{ module.location }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">Humedad Ideal (LLM):</span>
-              <span class="font-mono text-emerald-300 font-bold">{{ plant.optimal_moisture_min }}% - {{ plant.optimal_moisture_max }}%</span>
+              <span class="text-gray-400">Temp Óptima:</span>
+              <span class="font-mono text-emerald-300 font-bold">{{ plant.optimal_temp_min_c }}°C - {{ plant.optimal_temp_max_c }}°C</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">pH Óptimo:</span>
-              <span class="font-mono text-emerald-300 font-bold">{{ plant.optimal_ph_min }} - {{ plant.optimal_ph_max }}</span>
+              <span class="text-gray-400">Humedad Ideal:</span>
+              <span class="font-mono text-emerald-300 font-bold">{{ plant.optimal_humidity_min }}% - {{ plant.optimal_humidity_max }}%</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">Umbral Crítico Helada:</span>
-              <span class="font-mono text-cyan-300 font-bold">{{ plant.frost_critical_temp }} °C</span>
+              <span class="text-gray-400">DPV Fisiológico:</span>
+              <span class="font-mono text-cyan-300 font-bold">{{ plant.optimal_vpd_min_kpa }} - {{ plant.optimal_vpd_max_kpa }} kPa</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">NPK Sugerido:</span>
-              <span class="font-mono text-amber-300 font-bold">{{ plant.ideal_npk_ratio }}</span>
+              <span class="text-gray-400">Ciclo Recirculación:</span>
+              <span class="font-mono text-amber-300 font-bold">{{ plant.recirculation_cycle_minutes }} min cada {{ plant.recirculation_interval_hours }}h</span>
             </div>
           </div>
         </div>
 
-        <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-gray-400 italic">
-          💡 {{ plant.research_notes }}
+        <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-gray-400">
+          🌱 <strong>Fórmula Hidráulica:</strong> Recirculación NFT temporizada con protección anti-cavitación.
         </div>
       </div>
 
-      <!-- JEV Decision Engine (Real-Time Control) -->
-      <div class="glass rounded-2xl p-6 lg:col-span-2 border-l-4 {% if jev.decision_action %}border-emerald-500{% elif jev.failsafe_active %}border-cyan-500{% else %}border-slate-600{% endif %}">
+      <!-- JEV Decision Engine (Control Ciberfísico en Tiempo Real) -->
+      <div class="glass rounded-2xl p-6 lg:col-span-2 border-l-4 {% if jev.risk_level == 'CRITICAL' %}border-red-500{% elif jev.risk_level == 'WARNING' %}border-amber-500{% else %}border-emerald-500{% endif %}">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full {% if jev.decision_action %}bg-emerald-400 pulse-dot{% elif jev.failsafe_active %}bg-cyan-400 pulse-dot{% else %}bg-slate-500{% endif %}"></span>
-            <span class="text-xs font-mono uppercase tracking-wider text-gray-300 font-bold">Motor JEV (Control Numérico en Tiempo Real)</span>
+            <span class="w-3 h-3 rounded-full {% if jev.risk_level == 'CRITICAL' %}bg-red-400 pulse-dot{% elif jev.risk_level == 'WARNING' %}bg-amber-400 pulse-dot{% else %}bg-emerald-400 pulse-dot{% endif %}"></span>
+            <span class="text-xs font-mono uppercase tracking-wider text-gray-300 font-bold">Motor Ciberfísico TypeSafe JEV</span>
           </div>
-          <span class="text-xs font-mono text-gray-400">Lease: {{ jev.lease_duration_seconds }}s</span>
+          <span class="text-xs font-mono text-gray-400">Latencia: {{ jev.execution_time_ms }}ms</span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <!-- Action Status Box -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <!-- Pump State -->
           <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-            <span class="text-xs text-gray-400 block mb-1">Acción Binaria Ordenada</span>
-            <div class="text-2xl font-black {% if jev.decision_action %}text-emerald-400{% elif jev.failsafe_active %}text-cyan-400{% else %}text-slate-400{% endif %}">
-              {% if jev.decision_action %}ACTIVA (TRUE){% elif jev.failsafe_active %}PROTECCIÓN ANTI-HELADA{% else %}EN REPOSO (FALSE){% endif %}
+            <span class="text-xs text-gray-400 block mb-1">Mini-Bomba Sumergible 5V</span>
+            <div class="text-xl font-black {% if telemetry.pump_active %}text-emerald-400{% else %}text-slate-400{% endif %}">
+              {% if telemetry.pump_active %}ENCENDIDA (ON){% else %}APAGADA (OFF){% endif %}
             </div>
+            <span class="text-[10px] text-gray-500 font-mono">Relé GPIO 26</span>
           </div>
 
-          <!-- Modulated Intensity Box -->
+          <!-- Vent Servo -->
           <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-            <span class="text-xs text-gray-400 block mb-1">Modulación de Potencia</span>
-            <div class="flex items-center gap-3">
-              <span class="text-2xl font-black font-mono text-white">{{ jev.decision_intensity }}%</span>
-              <div class="flex-1 bg-slate-800 rounded-full h-3 overflow-hidden">
-                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: {{ jev.decision_intensity }}%"></div>
-              </div>
+            <span class="text-xs text-gray-400 block mb-1">Ventilación Cenital SG90</span>
+            <div class="text-xl font-black {% if telemetry.vent_servo_angle > 0 %}text-cyan-400{% else %}text-slate-400{% endif %}">
+              {{ telemetry.vent_servo_angle }}° Apertura
             </div>
+            <span class="text-[10px] text-gray-500 font-mono">PWM GPIO 18</span>
           </div>
-        </div>
 
-        <!-- Commanded Tools -->
-        <div class="mb-4">
-          <span class="text-xs text-gray-400 block mb-2 font-mono">Herramientas Comandadas de la Flota:</span>
-          <div class="flex flex-wrap gap-2">
-            {% if jev.commanded_tools %}
-              {% for tool in jev.commanded_tools %}
-                <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold flex items-center gap-1.5">
-                  ⚙️ {{ tool }}
-                </span>
-              {% endfor %}
-            {% else %}
-              <span class="text-xs text-gray-500 italic">Ningún actuador en marcha (Modo ahorro hídrico y energético)</span>
-            {% endif %}
+          <!-- Risk Level -->
+          <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+            <span class="text-xs text-gray-400 block mb-1">Estado de Seguridad</span>
+            <div class="text-xl font-black {% if jev.risk_level == 'CRITICAL' %}text-red-400{% elif jev.risk_level == 'WARNING' %}text-amber-400{% else %}text-emerald-400{% endif %}">
+              {{ jev.risk_level }}
+            </div>
+            <span class="text-[10px] text-gray-500 font-mono">Failsafe: {% if jev.fallback_rule_applied %}Modo Local{% else %}Cloud IA{% endif %}</span>
           </div>
         </div>
 
         <!-- Justification Reason -->
         <div class="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80 text-xs text-gray-300 font-mono">
-          <span class="text-emerald-400 font-bold">&gt; Justificación JEV:</span> {{ jev.justification_reason }}
+          <span class="text-emerald-400 font-bold">&gt; Decisión JEV:</span> {{ jev.reason }}
         </div>
       </div>
     </div>
 
-    <!-- Grid 2: Live Telemetry Metrics -->
+    <!-- Grid 2: Live Telemetry Metrics (Hardware Físico del MVP) -->
     <div>
       <h3 class="text-sm font-mono uppercase tracking-wider text-gray-400 font-bold mb-4 flex items-center gap-2">
-        <span>📡 Telemetría en Vivo (Nodo ESP32: {{ telemetry.device_id }})</span>
-        <span class="text-[10px] text-gray-500 font-mono">UTC: {{ now }}</span>
+        <span>📡 Telemetría en Vivo de Sensores Físicos (Módulo: {{ telemetry.module_id }})</span>
+        <span class="text-[10px] text-gray-500 font-mono">Hora: {{ now }}</span>
       </h3>
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
 
-        <!-- Soil Moisture -->
+        <!-- Nivel Estanque -->
         <div class="glass rounded-xl p-4 text-center">
-          <span class="text-xs text-gray-400 block mb-1">Humedad Suelo</span>
-          <span class="text-3xl font-black font-mono {% if telemetry.soil_moisture < plant.optimal_moisture_min %}text-amber-400{% else %}text-emerald-400{% endif %}">
-            {{ telemetry.soil_moisture }}%
+          <span class="text-xs text-gray-400 block mb-1">Nivel Estanque</span>
+          <span class="text-3xl font-black font-mono {% if telemetry.reservoir_level_percent < 20 %}text-red-400{% else %}text-emerald-400{% endif %}">
+            {{ telemetry.reservoir_level_percent }}%
           </span>
-          <span class="text-[10px] text-gray-500 block mt-1">Óptimo: {{ plant.optimal_moisture_min }}-{{ plant.optimal_moisture_max }}%</span>
+          <span class="text-[10px] text-gray-500 block mt-1">Sensor Resistivo GPIO 34/25</span>
         </div>
 
-        <!-- Ambient Temp -->
+        <!-- Temp Ambiente -->
         <div class="glass rounded-xl p-4 text-center">
           <span class="text-xs text-gray-400 block mb-1">Temp Ambiente</span>
-          <span class="text-3xl font-black font-mono {% if telemetry.ambient_temperature <= plant.frost_critical_temp %}text-cyan-400{% else %}text-white{% endif %}">
-            {{ telemetry.ambient_temperature }}°C
+          <span class="text-3xl font-black font-mono {% if telemetry.air_temperature > plant.optimal_temp_max_c %}text-amber-400{% else %}text-white{% endif %}">
+            {{ telemetry.air_temperature }}°C
           </span>
-          <span class="text-[10px] text-gray-500 block mt-1">Helada: {{ plant.frost_critical_temp }}°C</span>
+          <span class="text-[10px] text-gray-500 block mt-1">DHT11 (GPIO 4) / BME280</span>
         </div>
 
-        <!-- Soil pH -->
+        <!-- Humedad Aérea -->
         <div class="glass rounded-xl p-4 text-center">
-          <span class="text-xs text-gray-400 block mb-1">Acidez pH</span>
-          <span class="text-3xl font-black font-mono text-purple-400">
-            {{ telemetry.ph_level }}
+          <span class="text-xs text-gray-400 block mb-1">Humedad Relativa</span>
+          <span class="text-3xl font-black font-mono text-cyan-400">
+            {{ telemetry.air_humidity }}%
           </span>
-          <span class="text-[10px] text-gray-500 block mt-1">Rango: {{ plant.optimal_ph_min }}-{{ plant.optimal_ph_max }}</span>
+          <span class="text-[10px] text-gray-500 block mt-1">Sensor DHT11</span>
         </div>
 
-        <!-- Wind Speed -->
+        <!-- Presión Atmosférica -->
         <div class="glass rounded-xl p-4 text-center">
-          <span class="text-xs text-gray-400 block mb-1">Viento</span>
-          <span class="text-3xl font-black font-mono {% if telemetry.wind_speed_kmh and telemetry.wind_speed_kmh > plant.max_wind_tolerance_kmh %}text-red-400{% else %}text-blue-300{% endif %}">
-            {{ telemetry.wind_speed_kmh }} <span class="text-xs font-normal">km/h</span>
+          <span class="text-xs text-gray-400 block mb-1">Presión Atmosférica</span>
+          <span class="text-2xl font-black font-mono text-purple-300">
+            {{ telemetry.barometric_pressure_hpa }} <span class="text-xs font-normal">hPa</span>
           </span>
-          <span class="text-[10px] text-gray-500 block mt-1">Límite: {{ plant.max_wind_tolerance_kmh }} km/h</span>
+          <span class="text-[10px] text-gray-500 block mt-1">BME280 / BMP280 (I2C)</span>
         </div>
 
-        <!-- Soil Temp -->
+        <!-- DPV Fisiológico -->
         <div class="glass rounded-xl p-4 text-center">
-          <span class="text-xs text-gray-400 block mb-1">Temp Raíz</span>
-          <span class="text-3xl font-black font-mono text-gray-300">
-            {{ telemetry.soil_temperature }}°C
+          <span class="text-xs text-gray-400 block mb-1">Déficit Presión Vapor</span>
+          <span class="text-3xl font-black font-mono text-amber-400">
+            {{ telemetry.vpd_kpa }} <span class="text-xs font-normal">kPa</span>
           </span>
-          <span class="text-[10px] text-gray-500 block mt-1">Suelo Volcánico</span>
-        </div>
-
-        <!-- NPK -->
-        <div class="glass rounded-xl p-4 text-center">
-          <span class="text-xs text-gray-400 block mb-1">Nutrientes NPK</span>
-          <span class="text-lg font-bold font-mono text-amber-300 block">
-            {{ telemetry.nitrogen_ppm }}/{{ telemetry.phosphorus_ppm }}/{{ telemetry.potassium_ppm }}
-          </span>
-          <span class="text-[10px] text-gray-500 block mt-1">ppm (N-P-K)</span>
+          <span class="text-[10px] text-gray-500 block mt-1">Transpiración Foliar</span>
         </div>
       </div>
     </div>
 
-    <!-- Simulator Controller for Professors/Judges -->
-    <div class="glass rounded-2xl p-6">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h4 class="text-base font-bold text-white flex items-center gap-2">
-            🕹️ Panel de Pruebas y Simulación en Vivo (Demostración de Inferencia)
-          </h4>
-          <p class="text-xs text-gray-400">Inyecta condiciones climáticas extremas para observar la reacción inmediata del motor JEV.</p>
+    <!-- Controles Manuales Directos y Simulador de Demostración -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Controles Manuales para los 3 Actuadores -->
+      <div class="glass rounded-2xl p-6">
+        <h4 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+          <span>🕹️ Control Manual de Actuadores (Físico / Web / App)</span>
+        </h4>
+        <p class="text-xs text-gray-400 mb-4">Envía órdenes directas a través del broker MQTT y la API REST al ESP32:</p>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <button onclick="sendCommand('bomba_agua', 'ON', 60)" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition">
+            💧 Encender Bomba (60s)
+          </button>
+          <button onclick="sendCommand('bomba_agua', 'OFF', 0)" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition">
+            🛑 Apagar Bomba
+          </button>
+          <button onclick="sendCommand('servo_ventilacion', 'SET_ANGLE', 90)" class="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition">
+            🪟 Abrir Ventilación (90°)
+          </button>
+          <button onclick="sendCommand('servo_ventilacion', 'SET_ANGLE', 0)" class="px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs transition">
+            🔒 Cerrar Ventilación (0°)
+          </button>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button onclick="runSimulation('sequia')" class="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition">
-            ☀️ Simular Sequía Crítica
+        <div class="text-[11px] text-gray-400 font-mono">
+          Alimentación de actuadores: 5V DC regulado desde Arduino Uno R3 (Tierra común).
+        </div>
+      </div>
+
+      <!-- Simulador de Escenarios para Profesores y Jurados -->
+      <div class="glass rounded-2xl p-6">
+        <h4 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+          <span>🧪 Simulador de Escenarios Ciberfísicos (Demostración)</span>
+        </h4>
+        <p class="text-xs text-gray-400 mb-4">Permite probar la respuesta de seguridad y la IA frente a los evaluadores:</p>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <button onclick="runScenario('estanque_vacio')" class="px-4 py-2.5 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-700/60 text-red-200 text-xs font-bold transition">
+            ⚠️ Estanque Vacío (12%)
           </button>
-          <button onclick="runSimulation('helada')" class="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold transition">
-            ❄️ Simular Helada Nocturna
+          <button onclick="runScenario('calor_extremo')" class="px-4 py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 text-amber-200 text-xs font-bold transition">
+            🔥 Estrés Térmico (28.5°C)
           </button>
-          <button onclick="runSimulation('viento')" class="px-3.5 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-semibold transition">
-            💨 Simular Ráfaga de Viento
+          <button onclick="runScenario('optimo')" class="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-200 text-xs font-bold transition">
+            ✅ Condiciones Óptimas
           </button>
-          <button onclick="runSimulation('optimo')" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition">
-            🌱 Simular Clima Óptimo
+          <button onclick="runScenario('recirculacion')" class="px-4 py-2.5 rounded-xl bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 text-blue-200 text-xs font-bold transition">
+            🌊 Ciclo Recirculación
           </button>
+        </div>
+        <div class="text-[11px] text-gray-400 font-mono">
+          Simula perturbaciones en tiempo real para verificar la robustez del sistema.
         </div>
       </div>
     </div>
 
-    <!-- "Habla con tu Granja" (LLM Assistant Box) -->
+    <!-- Chat con la Celda Hidropónica (DeepSeek LLM) -->
     <div class="glass rounded-2xl p-6">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold">
-          🤖
-        </div>
-        <div>
-          <h4 class="text-base font-bold text-white">Función: "Habla con tu Granja" (LLM Cognitivo)</h4>
-          <p class="text-xs text-gray-400">Asistente conversacional agronómico con acceso directo a la telemetría y a las decisiones de JEV.</p>
-        </div>
-      </div>
+      <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+        <span>💬 Habla con tu Celda Hidropónica (Asistente IA DeepSeek)</span>
+      </h3>
+      <p class="text-xs text-gray-400 mb-4">
+        Haz consultas agronómicas en lenguaje natural. El modelo responde fundamentado en los datos reales del ESP32:
+      </p>
 
-      <!-- Chat History Area -->
-      <div id="chat-box" class="bg-slate-950/80 rounded-xl p-4 border border-slate-800 space-y-3 max-h-72 overflow-y-auto mb-4 text-xs font-sans">
-        <div class="flex gap-2">
-          <span class="text-purple-400 font-bold font-mono">AgroSense AI:</span>
-          <span class="text-gray-300">¡Hola! Soy tu asistente agronómico. Puedes preguntarme sobre el estado del riego, los nutrientes, el riesgo de heladas o el cuidado de tus {{ plant.common_name }}. ¿En qué te ayudo hoy?</span>
-        </div>
-      </div>
-
-      <!-- Chat Input Form -->
-      <form id="chat-form" onsubmit="sendChatMessage(event)" class="flex gap-2">
-        <input 
-          id="chat-input"
-          type="text" 
-          placeholder="Ej: ¿Por qué está apagado el riego? o ¿Cómo están los nutrientes de la tierra?" 
-          class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition"
-          required
-        />
-        <button 
-          type="submit" 
-          class="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition shadow-lg shadow-purple-600/30"
-        >
-          Consultar
+      <div class="flex gap-3 mb-4">
+        <input id="chatInput" type="text" placeholder="Ej: ¿Por qué la bomba está detenida o cómo afecta el DPV actual a las frutillas?"
+               class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-sans">
+        <button onclick="sendChat()" id="sendBtn"
+                class="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-sm transition shadow-lg shadow-emerald-500/20">
+          Consultar &rarr;
         </button>
-      </form>
+      </div>
+
+      <!-- Quick prompts -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="askQuick('¿Cuál es el estado del nivel de estanque y la bomba?')" class="text-xs px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300">
+          💧 ¿Nivel y estado de la bomba?
+        </button>
+        <button onclick="askQuick('¿Está la temperatura y el DPV dentro de los rangos óptimos?')" class="text-xs px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300">
+          🌡️ ¿Temp y DPV óptimos?
+        </button>
+        <button onclick="askQuick('¿Por qué es importante mantener el nivel de agua sobre 20%?')" class="text-xs px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300">
+          🛡️ ¿Por qué nivel &gt; 20%?
+        </button>
+      </div>
+
+      <!-- Chat Response Box -->
+      <div id="chatBox" class="hidden bg-slate-950 p-4 rounded-xl border border-slate-800 text-sm space-y-2">
+        <div class="flex items-center justify-between text-xs text-gray-400 border-b border-slate-800 pb-2">
+          <span class="font-bold text-emerald-400 flex items-center gap-1.5">
+            🤖 Respuesta Agronómica ASAI
+          </span>
+          <span id="chatModelBadge" class="font-mono text-[10px] bg-slate-900 px-2 py-0.5 rounded text-gray-400"></span>
+        </div>
+        <p id="chatResponse" class="text-gray-200 leading-relaxed font-sans whitespace-pre-line"></p>
+      </div>
     </div>
 
   </main>
 
-  <footer class="max-w-7xl mx-auto mt-12 mb-6 text-center text-xs text-gray-500 font-mono">
-    Santo Tomás (Sede Pedro de Valdivia, Temuco) — Evaluación Práctica Cloud & Feria Tecnológica
+  <footer class="max-w-7xl mx-auto text-center py-8 text-xs text-gray-500 font-mono">
+    Santo Tomás Temuco — IEI-059 IoT • IEI-058 Android • IEI-094 Integración de Competencias II • Feria de Innovación
   </footer>
 
-  <!-- Script for Interactive Simulation & Chat -->
   <script>
-    async function runSimulation(scenario) {
+    async function sendCommand(target, action, parameter_value) {
       try {
-        const res = await fetch(`/api/v1/simulate/${scenario}`, { method: 'POST' });
-        if (res.ok) {
-          window.location.reload();
-        }
-      } catch (err) {
-        alert("Error al simular escenario: " + err);
+        const res = await fetch('/api/v1/actuators/command', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            module_id: 'celda-01',
+            target: target,
+            action: action,
+            parameter_value: parameter_value,
+            triggered_by: 'web_dashboard'
+          })
+        });
+        const data = await res.json();
+        alert(`Comando ejecutado: ${data.message}`);
+        location.reload();
+      } catch (e) {
+        alert('Error ejecutando comando: ' + e);
       }
     }
 
-    async function sendChatMessage(e) {
-      e.preventDefault();
-      const input = document.getElementById('chat-input');
-      const box = document.getElementById('chat-box');
-      const q = input.value.trim();
-      if (!q) return;
+    async function runScenario(scenario) {
+      try {
+        const res = await fetch(`/api/v1/simulate/${scenario}`, { method: 'POST' });
+        const data = await res.json();
+        location.reload();
+      } catch (e) {
+        alert('Error en simulación: ' + e);
+      }
+    }
 
-      // Append user message
-      const userDiv = document.createElement('div');
-      userDiv.className = "flex gap-2";
-      userDiv.innerHTML = `<span class="text-emerald-400 font-bold font-mono">Tú:</span> <span class="text-gray-200">${q}</span>`;
-      box.appendChild(userDiv);
-      input.value = "";
-      box.scrollTop = box.scrollHeight;
+    async function askQuick(prompt) {
+      document.getElementById('chatInput').value = prompt;
+      await sendChat();
+    }
 
-      // Loading state
-      const loadingDiv = document.createElement('div');
-      loadingDiv.className = "flex gap-2 text-gray-500 italic";
-      loadingDiv.innerHTML = `<span class="text-purple-400 font-bold font-mono">AgroSense AI:</span> <span>Consultando telemetría y razonando...</span>`;
-      box.appendChild(loadingDiv);
-      box.scrollTop = box.scrollHeight;
+    async function sendChat() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const btn = document.getElementById('sendBtn');
+      const box = document.getElementById('chatBox');
+      const respP = document.getElementById('chatResponse');
+      const badge = document.getElementById('chatModelBadge');
+
+      btn.disabled = true;
+      btn.innerText = 'Analizando...';
+      box.classList.remove('hidden');
+      respP.innerText = 'Consultando telemetría del ESP32 y generando respuesta agronómica...';
 
       try {
         const res = await fetch('/api/v1/chat/farm', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: q })
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ question: text, session_id: 'web_user' })
         });
         const data = await res.json();
-        loadingDiv.innerHTML = `<span class="text-purple-400 font-bold font-mono">AgroSense AI:</span> <span class="text-gray-300">${data.answer}</span>`;
-      } catch (err) {
-        loadingDiv.innerHTML = `<span class="text-red-400 font-bold font-mono">Error:</span> <span class="text-red-300">No se pudo consultar el servicio.</span>`;
+        respP.innerText = data.answer;
+        badge.innerText = data.model_used || 'ASAI Assistant';
+      } catch (e) {
+        respP.innerText = 'Error al comunicarse con el asistente: ' + e;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Consultar →';
       }
-      box.scrollTop = box.scrollHeight;
     }
   </script>
 </body>

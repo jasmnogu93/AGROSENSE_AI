@@ -9,8 +9,9 @@ from fastapi.templating import Jinja2Templates
 from app.config import settings
 from app.models import (
     PlantProfile,
-    Sector,
+    HydroponicModule,
     TelemetryInput,
+    ActuatorCommand,
     JevDecisionResponse,
     FarmChatRequest,
     FarmChatResponse,
@@ -18,9 +19,9 @@ from app.models import (
 )
 
 app = FastAPI(
-    title="AgroSense AI — Cloud Management Hub",
-    description="Microservicio Cloud para Ingesta de Telemetría IoT, Orquestación JEV y Asistente Agronómico",
-    version="1.0.0"
+    title="AgroSense AI — Core Management Hub (SOA)",
+    description="Microservicio Hub para Ingesta IoT (ESP32), Orquestación JEV, Control de Actuadores y Asistente Agronómico",
+    version="2.1.0"
 )
 
 # Configuración de templates HTML
@@ -28,115 +29,118 @@ templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=templates_dir)
 
 # ==============================================================================
-# ESTADO EN MEMORIA (Base de datos en memoria para el prototipo Cloud)
+# ESTADO EN MEMORIA (Bandeja Hidropónica Celda 01)
 # ==============================================================================
+
 current_plant_profile = PlantProfile(
-    id="crop_avellano_tonda",
-    common_name="Avellano Europeo",
-    scientific_name="Corylus avellana",
-    variety="Tonda di Giffoni",
-    optimal_moisture_min=50.0,
-    optimal_moisture_max=70.0,
-    optimal_ph_min=5.8,
-    optimal_ph_max=6.8,
-    frost_critical_temp=-1.5,
-    max_wind_tolerance_kmh=20.0,
-    ideal_npk_ratio="12-8-16",
-    common_diseases=["Botrytis", "Pulgón del avellano", "Tizón bacteriano"],
-    researched_by_llm=True,
-    research_notes="Cultivo de alto valor en La Araucanía. Sensible a encharcamientos prolongados y heladas tardías."
+    id="crop_frutilla_hidroponica",
+    species_name="Frutilla Hidropónica (Fragaria x ananassa)",
+    variety="Albion / San Andreas",
+    optimal_temp_min_c=18.0,
+    optimal_temp_max_c=24.0,
+    optimal_humidity_min=55.0,
+    optimal_humidity_max=75.0,
+    optimal_vpd_min_kpa=0.8,
+    optimal_vpd_max_kpa=1.2,
+    recirculation_cycle_minutes=15,
+    recirculation_interval_hours=2,
+    researched_by_llm=True
 )
 
-current_sector = Sector(
-    id="cuartel_01_avellanos",
-    name="Cuartel 1 - Avellanos Norte",
-    soil_type="Trumao / Volcánico",
-    area_hectares=4.5,
+current_module = HydroponicModule(
+    id="celda-01",
+    name="Bandeja Hidropónica Piloto - Frutilla",
+    location="Santo Tomás Temuco - Laboratorio IoT",
     plant_profile_id=current_plant_profile.id,
-    growth_stage="FLORACION"
+    growth_stage="FLORACION",
+    active=True
 )
 
-# Lectura inicial de telemetría
+# Telemetría inicial mapeada al hardware físico real
 latest_telemetry = TelemetryInput(
-    device_id="esp32_nodo_01",
-    sector_id=current_sector.id,
-    soil_moisture=42.0,
-    ambient_temperature=16.5,
-    soil_temperature=13.0,
-    ambient_humidity=58.0,
-    ph_level=6.2,
-    nitrogen_ppm=15.0,
-    phosphorus_ppm=9.0,
-    potassium_ppm=18.0,
-    wind_speed_kmh=8.0
+    module_id=current_module.id,
+    air_temperature=21.8,
+    air_humidity=62.4,
+    barometric_pressure_hpa=1014.5,
+    reservoir_level_percent=85.0,
+    vpd_kpa=0.98,
+    pump_active=False,
+    vent_servo_angle=0,
+    stepper_dosing_steps=0
 )
 
+# Registro de últimos comandos ejecutados
+recent_commands: List[ActuatorCommand] = []
+
+
 # ==============================================================================
-# MOTOR DE INFERENCIA IA: TYPESAFE JEV (jevai.net) & FALLBACK LOCAL
+# MOTOR DETERMINISTA DE RESPALDO (LOCAL FALLBACK - CIBERFÍSICO)
 # ==============================================================================
+
+def calculate_vpd(temp_c: float, rh_pct: float) -> float:
+    """
+    Calcula el Déficit de Presión de Vapor (DPV) en kPa a partir de
+    la temperatura ambiente y la humedad relativa aérea.
+    Fórmula de Tetens: SVP = 0.61078 * exp((17.27 * T) / (T + 237.3))
+    """
+    import math
+    svp = 0.61078 * math.exp((17.27 * temp_c) / (temp_c + 237.3))
+    avp = svp * (rh_pct / 100.0)
+    return round(svp - avp, 2)
+
 
 def evaluate_jev_local(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisionResponse:
     """
-    Motor Heurístico Local de Respaldo (Fallback sin conexión):
-    Calcula deterministamente las 3 variables de control si la API de Jev no está disponible.
+    Reglas Ciberfísicas Deterministas para la Celda Hidropónica:
+    1. Regla Crítica (Nivel Estanque): Si el estanque está en <20%, BLOQUEAR la bomba para evitar cavitación.
+    2. Regla Térmica (Ventilación Cenital): Si Temp > 24°C o DPV > 1.2 kPa, ABRIR compuerta servo a 90°.
+    3. Regla de Recirculación: Si el nivel es óptimo, mantener la bomba lista para ciclos.
     """
-    # 1. Regla de Máxima Prioridad: Protección de Heladas
-    if telemetry.ambient_temperature <= profile.frost_critical_temp:
+    # 1. Regla de Máxima Prioridad: Protección de la Bomba contra Marcha en Seco
+    if telemetry.reservoir_level_percent < 20.0:
         return JevDecisionResponse(
-            decision_action=False,
-            decision_intensity=0,
-            commanded_tools=["calefactor_antihelada_sec1"],
-            justification_reason=f"BLOQUEO POR HELADA (Modo Local): Temp ambiente ({telemetry.ambient_temperature}°C) <= umbral crítico ({profile.frost_critical_temp}°C). Riego cancelado para evitar congelación foliar y radicular.",
-            lease_duration_seconds=1800,
-            failsafe_active=True
+            action_required=True,
+            recommended_pump_state=False,
+            recommended_vent_angle=telemetry.vent_servo_angle,
+            reason=f"BLOQUEO DE SEGURIDAD: Nivel de estanque crítico ({telemetry.reservoir_level_percent:.1f}% < 20.0%). Bomba 5V apagada inmediatamente para evitar sobrecalentamiento y cavitación.",
+            risk_level="CRITICAL",
+            execution_time_ms=12.0,
+            fallback_rule_applied=True
         )
 
-    # 2. Regla de Seguridad: Viento Excesivo para Equipos
-    if telemetry.wind_speed_kmh and telemetry.wind_speed_kmh > profile.max_wind_tolerance_kmh:
+    # 2. Regla de Ventilación Cenital por Estrés Térmico o DPV Elevado
+    dpv = telemetry.vpd_kpa or calculate_vpd(telemetry.air_temperature, telemetry.air_humidity)
+    if telemetry.air_temperature > profile.optimal_temp_max_c or dpv > profile.optimal_vpd_max_kpa:
         return JevDecisionResponse(
-            decision_action=False,
-            decision_intensity=0,
-            commanded_tools=["alerta_viento_alto"],
-            justification_reason=f"SUSPENSIÓN POR VIENTO (Modo Local): Ráfagas de {telemetry.wind_speed_kmh} km/h superan el límite de {profile.max_wind_tolerance_kmh} km/h. Drones y aspersores detenidos.",
-            lease_duration_seconds=900,
-            failsafe_active=False
+            action_required=True,
+            recommended_pump_state=telemetry.pump_active,
+            recommended_vent_angle=90,
+            reason=f"ALIVIO TÉRMICO ACTIVO: Temperatura ({telemetry.air_temperature:.1f}°C) o DPV ({dpv:.2f} kPa) superan el umbral óptimo del cultivo ({profile.optimal_temp_max_c}°C / {profile.optimal_vpd_max_kpa} kPa). Servomotor abre ventilación a 90°.",
+            risk_level="WARNING",
+            execution_time_ms=15.0,
+            fallback_rule_applied=True
         )
 
-    # 3. Regla de Riego: Humedad deficiente
-    if telemetry.soil_moisture < profile.optimal_moisture_min:
-        deficit = profile.optimal_moisture_min - telemetry.soil_moisture
-        power = min(95, int(60 + (deficit * 2.5)))
-        return JevDecisionResponse(
-            decision_action=True,
-            decision_intensity=power,
-            commanded_tools=["bomba_riego_principal", "electrovalvula_cuartel_01"],
-            justification_reason=f"RIEGO ACTIVADO (Modo Local): Humedad de suelo ({telemetry.soil_moisture}%) inferior al umbral mínimo del cultivo ({profile.optimal_moisture_min}%). Déficit hídrico de {deficit:.1f}%.",
-            lease_duration_seconds=1200,
-            failsafe_active=False
-        )
-
-    # 4. Regla: Suelo Óptimo o Saturado
+    # 3. Estado Óptimo y Seguro
     return JevDecisionResponse(
-        decision_action=False,
-        decision_intensity=0,
-        commanded_tools=[],
-        justification_reason=f"CONDICIÓN ÓPTIMA (Modo Local): Humedad ({telemetry.soil_moisture}%) dentro del rango ideal ({profile.optimal_moisture_min}% - {profile.optimal_moisture_max}%). Riego en reposo para cuidar el agua.",
-        lease_duration_seconds=1800,
-        failsafe_active=False
+        action_required=False,
+        recommended_pump_state=telemetry.pump_active,
+        recommended_vent_angle=0,
+        reason=f"CONDICIONES ÓPTIMAS: Nivel ({telemetry.reservoir_level_percent:.1f}%), Temp ({telemetry.air_temperature:.1f}°C) y DPV ({dpv:.2f} kPa) en rangos ideales para {profile.species_name}.",
+        risk_level="NORMAL",
+        execution_time_ms=8.0,
+        fallback_rule_applied=True
     )
+
 
 async def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevDecisionResponse:
     """
-    Invoca a la IA de Toma de Decisiones TypeSafe Jev (jevai.net) vía OpenRouter Decisions API.
-    Envía el estado de la granja (telemetría + perfil de cultivo) y formula las 3 preguntas nativas:
-    1. Noul: "¿Se debe activar la maquinaria?" -> Booleano 'Sí o No'
-    2. Score: "¿Cuál es el nivel de modulación requerido (0-100%)?" -> Intensidad '0 - 100'
-    3. Choice: "¿Qué actuador o herramienta específica debe despacharse?" -> 'Herramientas de la lista'
-    
-    Si no hay API key o hay fallo de red, conmuta transparentemente al motor de reglas local.
+    Invoca al motor de decisiones TypeSafe Jev (jevai.net) vía OpenRouter / Decisions API.
+    Si no hay conexión o no hay API key, conmuta al motor local sin interrupción.
     """
     api_key = settings.LLM_API_KEY.strip()
     api_error_notice = None
+
     if api_key and api_key != "tu_api_key_aqui" and not api_key.startswith("dev_local_key"):
         try:
             url = settings.JEV_DECISIONS_API_URL
@@ -144,40 +148,28 @@ async def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevD
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://agrosense.ai",
-                "X-Title": "AgroSense AI - TypeSafe Jev Decisions"
+                "X-Title": "AgroSense AI - Hydroponic Cell Decisions"
             }
             state = {
-                "sector": current_sector.name,
-                "crop": f"{profile.common_name} ({profile.variety})",
-                "soil_moisture_pct": telemetry.soil_moisture,
-                "optimal_moisture_min": profile.optimal_moisture_min,
-                "optimal_moisture_max": profile.optimal_moisture_max,
-                "ambient_temperature_c": telemetry.ambient_temperature,
-                "frost_critical_temp_c": profile.frost_critical_temp,
-                "wind_speed_kmh": telemetry.wind_speed_kmh or 0.0,
-                "max_wind_tolerance_kmh": profile.max_wind_tolerance_kmh,
-                "ph_level": telemetry.ph_level or 6.5
+                "module_id": telemetry.module_id,
+                "crop": profile.species_name,
+                "air_temp_c": telemetry.air_temperature,
+                "air_humidity_pct": telemetry.air_humidity,
+                "reservoir_level_pct": telemetry.reservoir_level_percent,
+                "barometric_pressure_hpa": telemetry.barometric_pressure_hpa,
+                "pump_active": telemetry.pump_active,
+                "optimal_temp_range": f"{profile.optimal_temp_min_c} - {profile.optimal_temp_max_c} C",
+                "optimal_humidity_range": f"{profile.optimal_humidity_min} - {profile.optimal_humidity_max} %"
             }
             questions = {
                 "activate_action": {
                     "type": "noul",
-                    "instructions": "¿Se debe activar alguna acción de riego o protección física inmediata para el cultivo?"
-                },
-                "modulation_intensity": {
-                    "type": "score",
-                    "instructions": "Nivel de potencia o modulación de intensidad requerida de 0 a 100 por ciento.",
-                    "levels": ["0", "20", "40", "60", "80", "100"]
+                    "instructions": "¿Se requiere conmutar algún actuador físico de la bandeja (bomba, servo de ventilación o motor dosificador)?"
                 },
                 "dispatched_tool": {
                     "type": "choice",
-                    "instructions": "¿Cuál de las herramientas registradas en la flota debe entrar en operación?",
-                    "options": [
-                        "ninguna",
-                        "bomba_riego_principal",
-                        "calefactor_antihelada_sec1",
-                        "electrovalvula_cuartel_01",
-                        "dron_fumigador_alfa"
-                    ]
+                    "instructions": "¿Qué actuador debe responder?",
+                    "options": ["ninguno", "bomba_agua", "servo_ventilacion", "motor_nutrientes"]
                 }
             }
             payload = {
@@ -185,136 +177,174 @@ async def evaluate_jev(telemetry: TelemetryInput, profile: PlantProfile) -> JevD
                 "state": state,
                 "questions": questions
             }
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=8.0) as client:
                 res = await client.post(url, json=payload, headers=headers)
                 if res.status_code == 200:
                     data = res.json()
                     decisions = data.get("decisions", {})
-                    
-                    # 1. Noul: Sí o No
-                    noul_obj = decisions.get("activate_action", {})
-                    if "value" in noul_obj and isinstance(noul_obj["value"], bool):
-                        is_active = noul_obj["value"]
-                    else:
-                        is_active = float(noul_obj.get("score", noul_obj.get("probability", 0))) > 0.5
-                    
-                    # 2. Score: 0 a 100
-                    score_obj = decisions.get("modulation_intensity", {})
-                    score_val = score_obj.get("value", "0")
-                    try:
-                        intensity = int(score_val)
-                    except Exception:
-                        intensity = int(float(score_obj.get("score", 0)) * 100) if is_active else 0
-                    
-                    # 3. Choice: Herramientas de la lista
-                    choice_val = decisions.get("dispatched_tool", {}).get("value", "ninguna")
-                    tools = [choice_val] if choice_val and choice_val != "ninguna" else []
+                    is_active = decisions.get("activate_action", {}).get("value", False)
+                    tool = decisions.get("dispatched_tool", {}).get("value", "ninguno")
                     
                     return JevDecisionResponse(
-                        decision_action=is_active,
-                        decision_intensity=intensity if is_active else 0,
-                        commanded_tools=tools,
-                        justification_reason=f"Decisión IA emitida por TypeSafe Jev ({settings.JEV_MODEL_NAME}): Noul={is_active}, Score={intensity}%, Choice={choice_val}",
-                        lease_duration_seconds=1200,
-                        failsafe_active=False
+                        action_required=bool(is_active),
+                        recommended_pump_state=True if tool == "bomba_agua" and is_active else False,
+                        recommended_vent_angle=90 if tool == "servo_ventilacion" and is_active else 0,
+                        reason=f"Decisión IA emitida por TypeSafe Jev ({settings.JEV_MODEL_NAME}): Actuador sugerido: '{tool}'. Inferencia completada en la nube.",
+                        risk_level="NORMAL",
+                        execution_time_ms=80.0,
+                        fallback_rule_applied=False
                     )
                 else:
-                    api_error_notice = f"❌ [Error al acceder a TypeSafe Jev - HTTP {res.status_code}]: "
+                    api_error_notice = f"⚠️ [Aviso Jev Cloud HTTP {res.status_code}]: Conmutando a reglas locales deterministas. "
         except Exception as e:
-            api_error_notice = f"❌ [Error al acceder a TypeSafe Jev ({type(e).__name__})]: "
-    else:
-        api_error_notice = "⚠️ [Aviso: API Key no detectada para TypeSafe Jev]: "
+            api_error_notice = f"⚠️ [Aviso Jev Cloud ({type(e).__name__})]: Conmutando a reglas locales deterministas. "
 
-    fallback_response = evaluate_jev_local(telemetry, profile)
+    fallback = evaluate_jev_local(telemetry, profile)
     if api_error_notice:
-        fallback_response.justification_reason = f"{api_error_notice}{fallback_response.justification_reason}"
-    return fallback_response
+        fallback.reason = f"{api_error_notice}{fallback.reason}"
+    return fallback
 
-# Decisión inicial (usando motor local en el arranque para no bloquear)
+
 latest_jev_decision = evaluate_jev_local(latest_telemetry, current_plant_profile)
 
 
 # ==============================================================================
-# ENDPOINTS REST DE LA API
+# ENDPOINTS REST DE LA API (SOA)
 # ==============================================================================
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """
-    Sirve el Dashboard Web interactivo de AgroSense AI para Azure.
+    Sirve el Dashboard Web interactivo de la Celda Hidropónica Piloto 01.
     """
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
-            "sector": current_sector,
+            "module": current_module,
             "plant": current_plant_profile,
             "telemetry": latest_telemetry,
             "jev": latest_jev_decision,
+            "recent_commands": recent_commands[-5:],
             "now": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
         }
     )
 
+
 @app.get("/api/v1/health", response_model=HealthStatus)
 async def health_check():
     """
-    Probe de salud para Azure Container Instances (ACI).
+    Probe de salud para Docker / Azure Container Instances.
     """
     return HealthStatus(
-        environment=settings.ENVIRONMENT
+        status="healthy",
+        environment=settings.ENVIRONMENT,
+        hardware_target="ESP32 DevKit V1 (DHT11 + BME280 + Nivel + 3 Actuadores)"
     )
+
 
 @app.post("/api/v1/telemetry", response_model=Dict[str, Any])
 async def ingest_telemetry(telemetry: TelemetryInput):
     """
-    Ingesta de telemetría IoT desde ESP32 u orígenes externos.
-    Dispara automáticamente la inferencia de JEV.
+    Ingesta de telemetría IoT desde el ESP32 o simulador.
+    Evalúa automáticamente las reglas de protección y actualiza el estado.
     """
     global latest_telemetry, latest_jev_decision
+    if not telemetry.vpd_kpa:
+        telemetry.vpd_kpa = calculate_vpd(telemetry.air_temperature, telemetry.air_humidity)
     latest_telemetry = telemetry
     latest_jev_decision = await evaluate_jev(latest_telemetry, current_plant_profile)
     return {
         "status": "success",
-        "message": "Telemetría recibida y evaluada por JEV",
+        "message": "Telemetría recibida e inferencia evaluada con éxito",
         "telemetry": latest_telemetry,
         "jev_decision": latest_jev_decision
     }
 
-@app.get("/api/v1/jev/decision", response_model=JevDecisionResponse)
-async def get_jev_decision():
+
+@app.get("/api/v1/telemetry/latest", response_model=TelemetryInput)
+async def get_latest_telemetry():
     """
-    Consulta la última decisión tomada por el motor JEV.
+    Endpoint consumido por la aplicación Android y el Dashboard para actualización en vivo.
     """
-    return latest_jev_decision
+    return latest_telemetry
+
+
+@app.post("/api/v1/actuators/command", response_model=Dict[str, Any])
+async def send_actuator_command(cmd: ActuatorCommand):
+    """
+    Envía una orden manual hacia los 3 actuadores físicos:
+    - bomba_agua (ON / OFF)
+    - servo_ventilacion (SET_ANGLE: 0 - 180°)
+    - motor_nutrientes (DISPENSE_STEPS: N pasos)
+    """
+    global latest_telemetry, recent_commands
+    recent_commands.append(cmd)
+
+    if cmd.target == "bomba_agua":
+        latest_telemetry.pump_active = (cmd.action.upper() == "ON")
+    elif cmd.target == "servo_ventilacion":
+        latest_telemetry.vent_servo_angle = int(cmd.parameter_value or 0)
+    elif cmd.target == "motor_nutrientes":
+        latest_telemetry.stepper_dosing_steps += int(cmd.parameter_value or 0)
+
+    return {
+        "status": "command_registered",
+        "actuator": cmd.target,
+        "action": cmd.action,
+        "parameter_value": cmd.parameter_value,
+        "triggered_by": cmd.triggered_by,
+        "message": f"Comando '{cmd.action}' registrado exitosamente para {cmd.target}."
+    }
+
+
+@app.get("/api/v1/schedule", response_model=Dict[str, Any])
+async def get_schedule():
+    """
+    Endpoint de calendario de recirculación (Requerimiento Semana 13 Integración II).
+    """
+    return {
+        "module_id": current_module.id,
+        "crop": current_plant_profile.species_name,
+        "recirculation_duration_minutes": current_plant_profile.recirculation_cycle_minutes,
+        "interval_hours": current_plant_profile.recirculation_interval_hours,
+        "next_cycle_utc": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "pump_status": "ACTIVA" if latest_telemetry.pump_active else "EN_ESPERA"
+    }
+
 
 @app.post("/api/v1/simulate/{scenario}")
 async def simulate_scenario(scenario: str):
     """
-    Simulador de escenarios para pruebas y demostración ante jueces y profesores:
-    - sequia: Humedad baja (22%), dispara riego potente.
-    - helada: Temperatura bajo cero (-2.5°C), activa protocolo anti-helada.
-    - optimo: Humedad ideal (62%), temp templada (19°C), reposo hídrico.
-    - viento: Viento de 28 km/h, suspende maquinaria.
+    Simulador de eventos físicos para demostración ante jueces y profesores:
+    - estanque_vacio: Nivel 12%, dispara corte crítico por riesgo de cavitación.
+    - calor_extremo: Temp 28.5°C, dispara apertura de ventilación servo a 90°.
+    - optimo: Nivel 85%, Temp 21°C, DPV 0.95 kPa, sistema en calma.
+    - recirculacion: Activa la bomba para demostración de flujo de agua.
     """
     global latest_telemetry, latest_jev_decision
 
-    if scenario == "sequia":
-        latest_telemetry.soil_moisture = 22.0
-        latest_telemetry.ambient_temperature = 24.0
-        latest_telemetry.wind_speed_kmh = 6.0
-    elif scenario == "helada":
-        latest_telemetry.ambient_temperature = -2.5
-        latest_telemetry.soil_moisture = 48.0
-        latest_telemetry.wind_speed_kmh = 4.0
+    if scenario == "estanque_vacio":
+        latest_telemetry.reservoir_level_percent = 12.0
+        latest_telemetry.pump_active = False
+    elif scenario == "calor_extremo":
+        latest_telemetry.air_temperature = 28.5
+        latest_telemetry.air_humidity = 42.0
+        latest_telemetry.vpd_kpa = calculate_vpd(28.5, 42.0)
     elif scenario == "optimo":
-        latest_telemetry.soil_moisture = 62.0
-        latest_telemetry.ambient_temperature = 19.5
-        latest_telemetry.wind_speed_kmh = 9.0
-    elif scenario == "viento":
-        latest_telemetry.wind_speed_kmh = 28.5
-        latest_telemetry.ambient_temperature = 17.0
+        latest_telemetry.reservoir_level_percent = 85.0
+        latest_telemetry.air_temperature = 21.5
+        latest_telemetry.air_humidity = 62.0
+        latest_telemetry.vpd_kpa = 0.95
+        latest_telemetry.vent_servo_angle = 0
+    elif scenario == "recirculacion":
+        latest_telemetry.reservoir_level_percent = 80.0
+        latest_telemetry.pump_active = True
     else:
-        raise HTTPException(status_code=400, detail="Escenario no reconocido. Use: sequia, helada, optimo, viento")
+        raise HTTPException(
+            status_code=400, 
+            detail="Escenario no reconocido. Use: estanque_vacio, calor_extremo, optimo, recirculacion"
+        )
 
     latest_jev_decision = await evaluate_jev(latest_telemetry, current_plant_profile)
     return {
@@ -323,54 +353,43 @@ async def simulate_scenario(scenario: str):
         "jev_decision": latest_jev_decision
     }
 
+
 @app.post("/api/v1/chat/farm", response_model=FarmChatResponse)
 async def chat_with_farm(request: FarmChatRequest):
     """
     Función 'Habla con tu Granja':
-    Invoca al LLM (DeepSeek / OpenAI compatible) inyectando en el System Prompt
-    la telemetría real del campo, el perfil botánico investigado y la justificación de JEV.
-    Si no hay API key configurada o falla la red, conmuta a modo local sin caerse.
+    Invoca al LLM (DeepSeek) inyectando en el prompt la telemetría real del ESP32,
+    el perfil hidropónico y la justificación de JEV.
     """
-    tools_used = ["TelemetryReading", "PlantProfile", "JevDecisionLog"]
+    tools_used = ["DHT11", "BME280", "SensorNivelResistivo", "JevDecisionLog"]
 
-    # Preparar el contexto agronómico completo para DeepSeek / LLM
     system_prompt = f"""Eres el Asistente Agronómico Inteligente de la plataforma 'AgroSense AI'.
-Tu labor es responder a las consultas del agricultor con tono profesional, empático, claro y fundamentado en los datos reales del campo.
+Estás a cargo de la celda hidropónica piloto '{current_module.name}'.
+Responde de forma profesional, concisa, técnica y empática basándote en los datos reales del hardware.
 
-CONTEXTO AGRONÓMICO DEL SECTOR:
-- Cuartel: {current_sector.name} ({current_sector.soil_type}, {current_sector.area_hectares} ha)
-- Especie: {current_plant_profile.common_name} (Variedad: {current_plant_profile.variety})
-- Etapa fenológica: {current_sector.growth_stage}
-- Requisitos botánicos ideales:
-  * Humedad de suelo óptima: {current_plant_profile.optimal_moisture_min}% a {current_plant_profile.optimal_moisture_max}%
-  * pH de suelo óptimo: {current_plant_profile.optimal_ph_min} a {current_plant_profile.optimal_ph_max}
-  * Umbral crítico de helada: {current_plant_profile.frost_critical_temp} °C
-  * Límite de viento: {current_plant_profile.max_wind_tolerance_kmh} km/h
-  * Proporción NPK recomendada: {current_plant_profile.ideal_npk_ratio}
-  * Plagas/hongos comunes: {', '.join(current_plant_profile.common_diseases)}
-  * Notas agronómicas: {current_plant_profile.research_notes}
+DATOS DE LA BANDEJA HIDROPÓNICA:
+- Cultivo: {current_plant_profile.species_name} ({current_plant_profile.variety})
+- Rango óptimo de Temperatura: {current_plant_profile.optimal_temp_min_c}°C a {current_plant_profile.optimal_temp_max_c}°C
+- Rango óptimo de Humedad: {current_plant_profile.optimal_humidity_min}% a {current_plant_profile.optimal_humidity_max}%
+- DPV óptimo: {current_plant_profile.optimal_vpd_min_kpa} a {current_plant_profile.optimal_vpd_max_kpa} kPa
 
-MEDICIONES ACTUALES DE SENSORES EN TERRENO:
-- Humedad de suelo: {latest_telemetry.soil_moisture}%
-- Temperatura ambiente: {latest_telemetry.ambient_temperature} °C
-- Temperatura de raíz: {latest_telemetry.soil_temperature} °C
-- Humedad ambiental: {latest_telemetry.ambient_humidity}%
-- Nivel de pH: {latest_telemetry.ph_level}
-- Nutrientes NPK: Nitrógeno {latest_telemetry.nitrogen_ppm} ppm, Fósforo {latest_telemetry.phosphorus_ppm} ppm, Potasio {latest_telemetry.potassium_ppm} ppm
-- Viento: {latest_telemetry.wind_speed_kmh} km/h
+MEDICIONES REALES DE SENSORES EN EL ESP32:
+- Temperatura ambiental: {latest_telemetry.air_temperature} °C
+- Humedad relativa aérea: {latest_telemetry.air_humidity} %
+- Presión barométrica: {latest_telemetry.barometric_pressure_hpa} hPa
+- Déficit de Presión de Vapor (DPV): {latest_telemetry.vpd_kpa} kPa
+- Nivel de solución en estanque: {latest_telemetry.reservoir_level_percent} %
 
-ESTADO DEL MOTOR DE CONTROL EN TIEMPO REAL (JEV):
-- Estado de activación: {'ACTIVO' if latest_jev_decision.decision_action else 'EN REPOSO'}
-- Modulación de potencia: {latest_jev_decision.decision_intensity}%
-- Herramientas en marcha: {', '.join(latest_jev_decision.commanded_tools) if latest_jev_decision.commanded_tools else 'Ninguna'}
-- Justificación determinista de JEV: {latest_jev_decision.justification_reason}
+ESTADO DE ACTUADORES FÍSICOS:
+- Mini-Bomba Sumergible 5V (Relé): {'ENCENDIDA (BOMBEANDO)' if latest_telemetry.pump_active else 'APAGADA (REPOSO)'}
+- Servo Ventilación Cenital: {latest_telemetry.vent_servo_angle}° de apertura
+- Motor Paso a Paso Nutrientes: {latest_telemetry.stepper_dosing_steps} pasos acumulados
 
-INSTRUCCIONES:
-1. Responde directamente a la consulta del usuario.
-2. Explica el por qué de las decisiones del sistema basándote en los números medidos.
-3. Sé conciso y utiliza recomendaciones agronómicas aplicables al trabajo de campo."""
+ESTADO DEL MOTOR CIBERFÍSICO JEV:
+- Nivel de riesgo: {latest_jev_decision.risk_level}
+- Justificación: {latest_jev_decision.reason}
+"""
 
-    # 1. Intentar invocar a la API de DeepSeek / OpenAI si hay Key real configurada
     api_key = settings.LLM_API_KEY.strip()
     api_error_notice = None
 
@@ -381,7 +400,7 @@ INSTRUCCIONES:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://agrosense.ai",
-                "X-Title": "AgroSense AI Cloud Hub"
+                "X-Title": "AgroSense AI Hydroponic Chat"
             }
             payload = {
                 "model": settings.LLM_MODEL_NAME,
@@ -392,67 +411,50 @@ INSTRUCCIONES:
                 "temperature": 0.3,
                 "max_tokens": 400
             }
-            async with httpx.AsyncClient(timeout=25.0) as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 res = await client.post(url, json=payload, headers=headers)
                 if res.status_code == 200:
                     data = res.json()
                     ai_answer = data["choices"][0]["message"]["content"]
                     return FarmChatResponse(
                         answer=ai_answer,
-                        tools_consulted=tools_used + [f"DeepSeek ({settings.LLM_MODEL_NAME})"]
+                        tools_consulted=tools_used + [f"DeepSeek ({settings.LLM_MODEL_NAME})"],
+                        model_used=settings.LLM_MODEL_NAME
                     )
                 else:
-                    api_error_notice = f"❌ [Error al acceder al modelo {settings.LLM_MODEL_NAME} - HTTP {res.status_code}]: Verifique que su API Key sea válida y tenga saldo o use un modelo gratuito como 'deepseek/deepseek-chat:free'.\n\n[Respuesta del Asistente Local]:\n"
+                    api_error_notice = f"⚠️ [Aviso: Fallo API externa HTTP {res.status_code} - Modo Local Activado]:\n"
         except Exception as e:
-            api_error_notice = f"❌ [Error al acceder al modelo de IA ({type(e).__name__})]: No se pudo conectar con el endpoint. Modo de contingencia local activado.\n\n[Respuesta del Asistente Local]:\n"
+            api_error_notice = f"⚠️ [Aviso: Error conexión ({type(e).__name__}) - Modo Local Activado]:\n"
     else:
-        api_error_notice = "⚠️ [Aviso: API Key no detectada]: No se detectó una API Key activa en tu archivo '.env'. Configura LLM_API_KEY en backend/.env (por ejemplo tu clave gratuita de OpenRouter).\n\n[Respuesta del Asistente Local]:\n"
+        api_error_notice = "⚠️ [Aviso: Clave LLM no configurada - Respuesta heurística local]:\n"
 
-    # 2. Modo Fallback Local (Respuestas contextualizadas sin depender de saldo/red)
+    # Respuesta Local Heurística Contextualizada
     q = request.question.lower()
-
-    if "riego" in q or "regar" in q or "bomba" in q:
-        if latest_jev_decision.decision_action:
-            answer = (
-                f"En este momento el riego está ACTIVO al {latest_jev_decision.decision_intensity}% de potencia "
-                f"en el sector '{current_sector.name}'. Motivo de JEV: {latest_jev_decision.justification_reason} "
-                f"La humedad actual del suelo es de {latest_telemetry.soil_moisture}% frente al mínimo óptimo de {current_plant_profile.optimal_moisture_min}%."
-            )
-        else:
-            answer = (
-                f"Actualmente el riego se encuentra DETENIDO. Motivo evaluado por JEV: {latest_jev_decision.justification_reason} "
-                f"La humedad de suelo está en {latest_telemetry.soil_moisture}%, lo cual cuida los recursos de la granja."
-            )
-    elif "helada" in q or "temperatura" in q or "frío" in q:
+    if "bomba" in q or "riego" in q or "agua" in q or "estanque" in q:
         answer = (
-            f"La temperatura ambiental registrada es de {latest_telemetry.ambient_temperature}°C. "
-            f"El umbral crítico de helada para tus {current_plant_profile.common_name} es de {current_plant_profile.frost_critical_temp}°C. "
-            f"Estado del sistema: {'ALERTA DE HELADA ACTIVA' if latest_telemetry.ambient_temperature <= current_plant_profile.frost_critical_temp else 'Temperatura en rango seguro'}."
+            f"El estanque reporta un nivel de solución del {latest_telemetry.reservoir_level_percent:.1f}%. "
+            f"La mini-bomba sumergible de 5V se encuentra {'ENCENDIDA recirculando nutrientes' if latest_telemetry.pump_active else 'APAGADA en ciclo de reposo'}. "
+            f"Evaluación de JEV: {latest_jev_decision.reason}"
         )
-    elif "planta" in q or "cultivo" in q or "avellano" in q:
+    elif "temperatura" in q or "humedad" in q or "clima" in q or "dpv" in q:
         answer = (
-            f"El cuartel activo tiene cultivado '{current_plant_profile.common_name}' (Variedad: {current_plant_profile.variety}). "
-            f"Parámetros investigados: Humedad óptima entre {current_plant_profile.optimal_moisture_min}% y {current_plant_profile.optimal_moisture_max}%, "
-            f"pH entre {current_plant_profile.optimal_ph_min} y {current_plant_profile.optimal_ph_max}. "
-            f"Consejo agronómico: {current_plant_profile.research_notes}"
-        )
-    elif "nutriente" in q or "ph" in q or "npk" in q:
-        answer = (
-            f"El pH de tu suelo está en {latest_telemetry.ph_level} (Rango ideal: {current_plant_profile.optimal_ph_min} - {current_plant_profile.optimal_ph_max}). "
-            f"Nivel de macronutrientes: Nitrógeno: {latest_telemetry.nitrogen_ppm} ppm, Fósforo: {latest_telemetry.phosphorus_ppm} ppm, "
-            f"Potasio: {latest_telemetry.potassium_ppm} ppm. Proporción NPK sugerida: {current_plant_profile.ideal_npk_ratio}."
+            f"En la celda registramos {latest_telemetry.air_temperature:.1f}°C de temperatura y {latest_telemetry.air_humidity:.1f}% de humedad relativa. "
+            f"El Déficit de Presión de Vapor (DPV) calculado es de {latest_telemetry.vpd_kpa:.2f} kPa (Rango ideal: 0.8 a 1.2 kPa). "
+            f"El servomotor de ventilación cenital se encuentra a {latest_telemetry.vent_servo_angle}°."
         )
     else:
         answer = (
-            f"Hola, soy el asistente botánico de AgroSense AI. Tu granja en '{current_sector.name}' "
-            f"reporta humedad de {latest_telemetry.soil_moisture}%, temperatura de {latest_telemetry.ambient_temperature}°C "
-            f"y viento de {latest_telemetry.wind_speed_kmh} km/h. Decisión de JEV: '{latest_jev_decision.justification_reason}'. "
-            f"¿Deseas consultar sobre riego, fertilización o riesgo de heladas?"
+            f"Hola, soy el asistente de la Celda Hidropónica Piloto 01 ({current_plant_profile.species_name}). "
+            f"Actualmente el sistema está en estado {latest_jev_decision.risk_level}: Temp {latest_telemetry.air_temperature:.1f}°C, "
+            f"Humedad {latest_telemetry.air_humidity:.1f}%, Presión {latest_telemetry.barometric_pressure_hpa:.1f} hPa y Estanque al {latest_telemetry.reservoir_level_percent:.1f}%. "
+            f"¿Deseas información sobre el estado de la bomba, ventilación o nutrientes?"
         )
 
     if api_error_notice:
         answer = f"{api_error_notice}{answer}"
+
     return FarmChatResponse(
         answer=answer,
-        tools_consulted=tools_used + ["Motor Local Heurístico"]
+        tools_consulted=tools_used + ["Motor Local Heurístico"],
+        model_used="local-heuristics"
     )

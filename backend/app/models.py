@@ -1,212 +1,146 @@
-from datetime import datetime, date
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
 # ==============================================================================
-# 1. PERFIL BOTÁNICO Y SECTORES DE LA GRANJA
+# 1. PERFIL BOTÁNICO DE LA BANDEJA CELULAR (HIDROPONÍA PILOTO 01)
 # ==============================================================================
 
 class PlantProfile(BaseModel):
     """
-    Entidad PlantProfile: Ficha agronómica investigada por el LLM.
-    Define los umbrales fisiológicos de calibración para JEV.
+    Ficha agronómica de la especie cultivada en la bandeja hidropónica.
+    Define los umbrales microclimáticos y el ciclo de recirculación.
     """
-    id: str = Field(..., description="Identificador único del cultivo (ej: crop_avellano_tonda)")
-    common_name: str = Field(..., description="Nombre común (ej: Avellano Europeo)")
-    scientific_name: Optional[str] = Field(None, description="Nombre científico botánico")
-    variety: Optional[str] = Field(None, description="Variedad o clon")
-    optimal_moisture_min: float = Field(..., description="Humedad mínima óptima (%)")
-    optimal_moisture_max: float = Field(..., description="Humedad máxima óptima (%)")
-    optimal_ph_min: float = Field(..., description="pH mínimo tolerado")
-    optimal_ph_max: float = Field(..., description="pH máximo tolerado")
-    frost_critical_temp: float = Field(..., description="Temperatura umbral de helada (°C)")
-    max_wind_tolerance_kmh: float = Field(20.0, description="Viento máximo tolerado (km/h)")
-    ideal_npk_ratio: Optional[str] = Field("12-8-16", description="Proporción N-P-K ideal")
-    common_diseases: List[str] = Field(default_factory=list, description="Plagas y hongos típicos")
-    researched_by_llm: bool = Field(True, description="Si fue investigado por IA")
-    research_notes: Optional[str] = Field(None, description="Notas agronómicas de manejo")
+    id: str = Field(default="crop_frutilla_hidroponica", description="Identificador único del cultivo")
+    species_name: str = Field(default="Frutilla Hidropónica (Fragaria x ananassa)", description="Nombre de la especie")
+    variety: Optional[str] = Field("Albion / San Andreas", description="Variedad hidropónica")
+    optimal_temp_min_c: float = Field(18.0, description="Temperatura ambiental mínima óptima (°C)")
+    optimal_temp_max_c: float = Field(24.0, description="Temperatura ambiental máxima óptima (°C)")
+    optimal_humidity_min: float = Field(55.0, description="Humedad relativa mínima (%)")
+    optimal_humidity_max: float = Field(75.0, description="Humedad relativa máxima (%)")
+    optimal_vpd_min_kpa: float = Field(0.8, description="Déficit de Presión de Vapor mínimo (kPa)")
+    optimal_vpd_max_kpa: float = Field(1.2, description="Déficit de Presión de Vapor máximo (kPa)")
+    recirculation_cycle_minutes: int = Field(15, description="Minutos de bomba encendida por ciclo")
+    recirculation_interval_hours: int = Field(2, description="Horas entre ciclos de recirculación")
+    researched_by_llm: bool = Field(True, description="Si los parámetros fueron calibrados con IA")
 
 
-class Sector(BaseModel):
+class HydroponicModule(BaseModel):
     """
-    Entidad Sector: Cuartel físico de la granja.
+    Entidad Celda Piloto: Prototipo celular de 1 bandeja hidropónica.
     """
-    id: str = Field(..., description="Código del cuartel (ej: cuartel_01_avellanos)")
-    name: str = Field(..., description="Nombre visible del sector")
-    soil_type: str = Field("Trumao / Volcánico", description="Tipo de suelo")
-    area_hectares: float = Field(..., description="Superficie en hectáreas")
-    plant_profile_id: str = Field(..., description="FK al cultivo actual")
-    growth_stage: str = Field("FLORACION", description="Etapa fenológica")
+    id: str = Field("celda-01", description="ID único del módulo (ej: celda-01)")
+    name: str = Field("Bandeja Hidropónica Piloto - Frutilla", description="Nombre descriptivo")
+    location: str = Field("Santo Tomás Temuco - Laboratorio IoT", description="Ubicación física")
+    plant_profile_id: str = Field("crop_frutilla_hidroponica", description="Cultivo asignado")
+    growth_stage: str = Field("FLORACION", description="Etapa fenológica: VEGETATIVO, FLORACION, COSECHA")
+    active: bool = Field(True, description="Estado operativo de la celda")
 
 
 # ==============================================================================
-# 2. INGESTA DE TELEMETRÍA (SUELO ESTRATIFICADO + AMBIENTE COMPLETO)
+# 2. INGESTA DE TELEMETRÍA (SENSORES REALES DEL MVP DE HARDWARE)
 # ==============================================================================
 
 class TelemetryInput(BaseModel):
     """
-    Entidad TelemetryReading: Mediciones en tiempo real recibidas desde ESP32 / Sensores.
-    Incluye estratificación de suelo y variables microclimáticas profesionales.
+    Mediciones en tiempo real emitidas por el ESP32 DevKit V1 vía MQTT o REST.
+    Mapeadas exactamente al inventario físico de hardware.
     """
-    device_id: str = Field("esp32_nodo_01", description="ID del dispositivo en terreno")
-    sector_id: str = Field("cuartel_01_avellanos", description="ID del sector")
+    module_id: str = Field(default="celda-01", description="ID de la bandeja")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Marca temporal UTC")
 
-    # --- Humedad y Suelo Principal ---
-    soil_moisture: float = Field(..., ge=0, le=100, description="Humedad suelo promedio / superficial (%)")
-    soil_temperature: Optional[float] = Field(15.0, description="Temperatura radicular (°C)")
-    ph_level: Optional[float] = Field(6.2, ge=0, le=14, description="Acidez del suelo (0 - 14)")
+    # --- Sensores Físicos Reales Conectados ---
+    air_temperature: float = Field(..., ge=-10.0, le=60.0, description="Temperatura ambiental °C (DHT11 / BME280)")
+    air_humidity: float = Field(..., ge=0.0, le=100.0, description="Humedad relativa % (DHT11)")
+    barometric_pressure_hpa: float = Field(default=1013.25, ge=800.0, le=1200.0, description="Presión atmosférica hPa (BME280 / BMP280 en I2C)")
+    reservoir_level_percent: float = Field(..., ge=0.0, le=100.0, description="Nivel de estanque % (Sensor Resistivo GPIO 34 con pulso en 25)")
 
-    # --- Estratificación de Humedad Multiprofundidad ---
-    soil_moisture_20cm: Optional[float] = Field(None, ge=0, le=100, description="Humedad a 20 cm (raíz activa)")
-    soil_moisture_40cm: Optional[float] = Field(None, ge=0, le=100, description="Humedad a 40 cm (zona de reserva)")
-    soil_moisture_60cm: Optional[float] = Field(None, ge=0, le=100, description="Humedad a 60 cm (control de percolación)")
-    matric_potential_kpa: Optional[float] = Field(None, description="Tensión de agua en suelo (kPa / cbar)")
-    ec_salinity_dsm: Optional[float] = Field(None, description="Conductividad eléctrica / Salinidad (dS/m)")
+    # --- Métrica Fisiológica Calculada ---
+    vpd_kpa: Optional[float] = Field(None, description="Déficit de Presión de Vapor calculado (kPa)")
 
-    # --- Nutrición Mineral (Primarios NPK y Secundarios Ca/Mg) ---
-    nitrogen_ppm: Optional[float] = Field(14.0, description="Nitrógeno N (ppm)")
-    phosphorus_ppm: Optional[float] = Field(8.0, description="Fósforo P (ppm)")
-    potassium_ppm: Optional[float] = Field(18.0, description="Potasio K (ppm)")
-    calcium_ppm: Optional[float] = Field(None, description="Calcio Ca (ppm)")
-    magnesium_ppm: Optional[float] = Field(None, description="Magnesio Mg (ppm)")
+    # --- Estado de Actuadores Físicos en la Maqueta ---
+    pump_active: bool = Field(default=False, description="Estado de la mini-bomba sumergible 5V (Relé GPIO 26)")
+    vent_servo_angle: int = Field(default=0, ge=0, le=180, description="Ángulo del servo SG90 para ventilación (GPIO 18)")
+    stepper_dosing_steps: int = Field(default=0, description="Pasos acumulados del motor PaP 28BYJ-48 (ULN2003)")
 
-    # --- Microclima Atmosférico y Estación Meteorológica ---
-    ambient_temperature: float = Field(..., description="Temperatura ambiental (°C)")
-    ambient_humidity: Optional[float] = Field(58.0, ge=0, le=100, description="Humedad ambiental (%)")
-    wind_speed_kmh: Optional[float] = Field(8.0, description="Velocidad del viento (km/h)")
-    wind_direction_deg: Optional[float] = Field(None, ge=0, le=360, description="Dirección del viento en grados (0-360°)")
-    rain_gauge_mm: Optional[float] = Field(0.0, ge=0, description="Lluvia acumulada 24h (mm)")
-    leaf_wetness_minutes: Optional[float] = Field(0.0, description="Mojamiento foliar acumulado (min)")
-    vpd_kpa: Optional[float] = Field(None, description="Déficit de Presión de Vapor - VPD (kPa)")
-    dew_point_c: Optional[float] = Field(None, description="Punto de rocío (°C)")
-    par_radiation: Optional[float] = Field(None, description="Radiación fotosintética útil PAR (μmol/m²/s)")
+    # --- Sensores de Fase 2 (Extensiones Futuras - Nullable) ---
+    ph_level: Optional[float] = Field(None, ge=0.0, le=14.0, description="Sonda de pH análoga (Fase 2)")
+    ec_salinity_dsm: Optional[float] = Field(None, ge=0.0, le=10.0, description="Sonda de conductividad EC (Fase 2)")
+    light_lux: Optional[float] = Field(None, ge=0.0, le=100000.0, description="Sensor fotocelda LDR (Fase 2)")
 
 
 # ==============================================================================
-# 3. ENTIDADES DE CICLO COMPLETO DE CULTIVO (PREPARACIÓN, FENOLOGÍA, SANIDAD, COSECHA)
+# 3. CONTROL DE ACTUADORES FÍSICOS (POLIMÓRFICO / SOA)
 # ==============================================================================
 
-class ManagementZone(BaseModel):
+class ActuatorCommand(BaseModel):
     """
-    Zonificación de Suelo y Preparación de Terreno / Arado.
-    Permite labranza de precisión y subsolado según compactación.
+    Comando emitido desde el Dashboard Web, App Android o Motor de Reglas
+    hacia los actuadores físicos del ESP32.
     """
-    id: str = Field(..., description="ID de la zona (ej: zm_cuartel1_alta_arcilla)")
-    sector_id: str = Field(..., description="ID del sector al que pertenece")
-    texture_class: str = Field("Franco Arcilloso", description="Clase textural del suelo")
-    organic_matter_percent: float = Field(4.5, description="Porcentaje de materia orgánica (%)")
-    compaction_psi: float = Field(220.0, description="Resistencia a la penetración (psi)")
-    plowing_depth_recommended_cm: int = Field(35, description="Profundidad recomendada de subsolado (cm)")
-    requires_subsoiling: bool = Field(False, description="¿Requiere romper pie de arado?")
-
-
-class CropPhenology(BaseModel):
-    """
-    Seguimiento del Desarrollo Fenológico y Demanda Hídrica (FAO 56).
-    """
-    id: str = Field(..., description="ID del registro fenológico")
-    sector_id: str = Field(..., description="Sector monitoreado")
-    current_stage: str = Field("FLORACION", description="Etapa fenológica actual")
-    gdd_accumulated: float = Field(420.5, description="Grados-Día de Crecimiento acumulados")
-    chill_hours_accumulated: float = Field(680.0, description="Horas de frío acumuladas (< 7.2°C)")
-    kc_coefficient: float = Field(0.85, description="Coeficiente de cultivo dinámico (Kc)")
-    etc_mm_day: float = Field(3.8, description="Evapotranspiración del cultivo estimada (mm/día)")
-
-
-class PhytosanitaryApplication(BaseModel):
-    """
-    Registro Fitosanitario y Control de Días de Carencia (GlobalGAP).
-    """
-    id: str = Field(..., description="ID de la aplicación (ej: app_2026_01)")
-    sector_id: str = Field(..., description="Sector tratado")
-    target_pest_or_disease: str = Field(..., description="Plaga u hongo objetivo (ej: Botrytis cinerea)")
-    product_name: str = Field(..., description="Nombre comercial del producto")
-    active_ingredient: str = Field(..., description="Ingrediente químico o biológico activo")
-    dose_per_hectare: str = Field(..., description="Dosis aplicada (ej: 1.5 L/ha)")
-    application_date: datetime = Field(default_factory=datetime.utcnow, description="Fecha y hora de aplicación")
-    phi_days: int = Field(..., description="Días de Carencia (Pre-Harvest Interval)")
-    safe_harvest_date: date = Field(..., description="Fecha mínima legal para iniciar cosecha")
-    applied_by: str = Field("dron_fumigador_01", description="Operador humano o dron de la flota")
-
-
-class HarvestQualityLog(BaseModel):
-    """
-    Monitoreo de Calidad Pre-Cosecha y Madurez de Fruta.
-    """
-    id: str = Field(..., description="ID de la muestra de calidad")
-    sector_id: str = Field(..., description="Sector evaluado")
-    sampling_date: datetime = Field(default_factory=datetime.utcnow, description="Fecha de muestreo")
-    brix_degrees: float = Field(..., description="Concentración de azúcares solubles (°Brix)")
-    firmness_durofel: float = Field(..., description="Firmeza de pulpa (Unidades Durofel o kg/cm²)")
-    titratable_acidity: Optional[float] = Field(None, description="Acidez titulable (% ácido málico/cítrico)")
-    harvest_ready: bool = Field(False, description="¿Cumple estándares comerciales de cosecha?")
-
-
-class WorkOrder(BaseModel):
-    """
-    Órdenes de Trabajo del Campo (Despacho a humanos o robots autónomos).
-    """
-    id: str = Field(..., description="ID de la orden (ej: wo_riego_20260401)")
-    sector_id: str = Field(..., description="Sector objetivo")
-    operation_type: str = Field(..., description="ARADO, RIEGO, FERTIRRIEGO, PULVERIZACION, PODA, COSECHA")
-    assigned_entity_type: str = Field("AUTONOMOUS_ACTUATOR", description="HUMANO o AUTONOMOUS_ACTUATOR / ROBOT")
-    assigned_entity_id: str = Field("bomba_riego_principal", description="ID de maquinaria o cuadrilla")
-    status: str = Field("COMPLETED", description="PENDING, IN_PROGRESS, COMPLETED, CANCELLED")
-    weather_safe_validated: bool = Field(True, description="¿Fue validada la ventana climática por IA?")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = None
+    module_id: str = Field(default="celda-01")
+    target: str = Field(..., description="bomba_agua | servo_ventilacion | motor_nutrientes")
+    action: str = Field(..., description="ON | OFF | SET_ANGLE | DISPENSE_STEPS")
+    parameter_value: Optional[float] = Field(default=0.0, description="Duración en seg, ángulo (0-180°) o pasos motor")
+    triggered_by: str = Field(default="manual", description="manual_android | manual_web | jev_rule | schedule")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ==============================================================================
-# 4. MOTOR DE DECISIONES TYPESAFE JEV (jevai.net)
+# 4. INFERENCIA CIBERFÍSICA (TYPESAFE JEV - jevai.net)
 # ==============================================================================
 
 class JevDecisionResponse(BaseModel):
     """
     Salida de decisión del Motor JEV (jevai.net):
-    1. Noul: Booleano con probabilidad (true/false)
-    2. Score: Modulación continua (0 - 100%)
-    3. Choice: Selección de actuadores/herramientas del catálogo
+    - Decisión ciberfísica en <80ms.
+    - Protección contra cavitación de bomba y sobrecalentamiento.
     """
-    decision_action: bool = Field(..., description="¿Se activa maniobra física? (true/false)")
-    decision_intensity: int = Field(..., ge=0, le=100, description="Intensidad ordenada (0 - 100%)")
-    commanded_tools: List[str] = Field(..., description="Herramientas comandadas de la flota")
-    justification_reason: str = Field(..., description="Fundamentación determinista de la regla")
-    lease_duration_seconds: int = Field(900, description="Tiempo de vigencia seguro (segundos)")
-    executed_at: datetime = Field(default_factory=datetime.utcnow, description="Fecha de inferencia")
-    failsafe_active: bool = Field(False, description="Si opera en modo de prevención")
+    action_required: bool = Field(..., description="¿Se requiere intervención de actuadores?")
+    recommended_pump_state: bool = Field(..., description="Estado recomendado para la bomba sumergible")
+    recommended_vent_angle: int = Field(0, description="Ángulo recomendado para ventilación cenital (0-180°)")
+    reason: str = Field(..., description="Explicación determinista de la regla")
+    risk_level: str = Field(default="NORMAL", description="NORMAL | WARNING | CRITICAL")
+    execution_time_ms: float = Field(default=80.0, description="Latencia de inferencia en milisegundos")
+    fallback_rule_applied: bool = Field(False, description="Indica si operó en modo local sin internet")
+    executed_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ==============================================================================
-# 5. ASISTENTE COGNITIVO ("HABLA CON TU GRANJA") Y SALUD DE LA API
+# 5. ASISTENTE AGRONÓMICO CONVERSACIONAL (DEEPSEEK LLM)
 # ==============================================================================
 
 class FarmChatRequest(BaseModel):
     """
-    Petición para la función 'Habla con tu Granja'.
+    Petición para el asistente inteligente en lenguaje natural.
     """
-    question: str = Field(..., description="Pregunta del agricultor en lenguaje natural")
-    session_id: Optional[str] = Field("web_session_01", description="ID de sesión")
+    question: str = Field(..., description="Consulta del usuario (ej: ¿Por qué la humedad está baja?)")
+    session_id: Optional[str] = Field("session_01", description="ID de sesión")
+    include_live_telemetry: bool = Field(True, description="Adjuntar los últimos sensores al prompt del LLM")
 
 
 class FarmChatResponse(BaseModel):
     """
-    Respuesta generada por el LLM con datos reales de la granja.
+    Respuesta agronómica generada por DeepSeek LLM con contexto de la celda.
     """
-    answer: str = Field(..., description="Respuesta explicativa del LLM")
-    tools_consulted: List[str] = Field(default_factory=list, description="Tablas/métricas consultadas")
+    answer: str = Field(..., description="Explicación agronómica fundamentada")
+    tools_consulted: List[str] = Field(default_factory=list, description="Variables analizadas (DHT11, BME, etc.)")
+    model_used: str = Field(default="deepseek-chat", description="Modelo LLM de inferencia")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
+# ==============================================================================
+# 6. ESTADO DE SALUD DEL SERVICIO (AZURE / DOCKER PROBE)
+# ==============================================================================
+
 class HealthStatus(BaseModel):
     """
-    Respuesta para el probe de salud de Azure ACI.
+    Chequeo de disponibilidad del backend.
     """
     status: str = "healthy"
-    service: str = "AgroSense AI Cloud Backend"
-    version: str = "1.0.0"
-    environment: str = "development"
-    engine_jev: str = "ONLINE"
+    service: str = "AgroSense AI (ASAI) - Core Backend Hub"
+    version: str = "2.1.0"
+    environment: str = "production"
+    hardware_target: str = "ESP32 DevKit V1 (DHT11 + BME280 + Nivel + 3 Actuadores)"
     timestamp: datetime = Field(default_factory=datetime.utcnow)

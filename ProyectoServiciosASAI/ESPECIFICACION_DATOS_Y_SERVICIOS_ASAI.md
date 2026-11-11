@@ -3,59 +3,61 @@
 ### Enfoque: Arquitectura Orientada a Servicios (SOA)
 
 **Fecha:** Noviembre 2026  
-**Versión:** 2.0 (Celda Piloto 01 - 1 Bandeja Hidropónica)  
+**Versión:** 2.1 (Alineada al Inventario Físico Real de Hardware MVP)  
 **Institución:** Universidad Santo Tomás — Sede Pedro de Valdivia, Temuco  
+**Microcontrolador:** ESP32 DevKit V1 + Arduino Uno R3 (Alimentación 5V regulada)  
 **Cátedras Integradas:** Internet de las Cosas (IEI-059), Programación Android (IEI-058), Integración de Competencias II (IEI-094), Feria de Innovación.
 
 ---
 
-## 1. Propósito del Documento
+## 1. Arquitectura de Servicios y Flujo de Datos
 
-Este documento define de forma formal e inequívoca todos los **contratos de datos, formatos de intercambio (JSON), tópicos MQTT, endpoints REST y el esquema de base de datos relacional (SQL DDL)**. 
-
-Al trabajar con una **Arquitectura Orientada a Servicios (SOA)**, cualquier integrante del equipo puede desarrollar su parte (firmware en ESP32, app nativa Android o backend FastAPI) de manera completamente autónoma, siempre que respete los contratos aquí especificados.
+El sistema opera mediante **servicios desacoplados** que se comunican mediante contratos JSON estándar por MQTT y REST.
 
 ```mermaid
 flowchart LR
     subgraph S1 ["Servicio 1: Edge IoT (ESP32)"]
-        PUB["Publica Telemetría"]
-        SUB["Escucha Comandos"]
+        SENSORES["Lectura de Sensores:<br/>• DHT11 (Temp/Hum)<br/>• BME280 (Presión/Temp)<br/>• Nivel Resistivo (GPIO 34/25)"]
+        ACTUADORES["Actuadores Físicos:<br/>• Relé Bomba 5V (GPIO 26)<br/>• Servo Ventilación SG90 (GPIO 18)<br/>• Motor PaP ULN2003 (GPIO 19,23,5,13)"]
     end
 
     subgraph BROKER ["Broker HiveMQ (MQTT)"]
         TOPIC_TEL["agrosense/telemetria/celda01"]
         TOPIC_CMD["agrosense/comandos/celda01"]
+        TOPIC_ALERT["agrosense/alertas/celda01"]
     end
 
     subgraph S2 ["Servicio 2: Backend Cloud Hub (FastAPI)"]
         API["REST Endpoints (/api/v1/...)"]
-        DB[(Base de Datos SQL)]
+        RULES["Reglas Deterministas Fallback"]
+        DB[(Base de Datos SQL DDL)]
     end
 
     subgraph S3A ["Servicio 3A: Dashboard Web"]
-        WEB["Jinja2 / Tailwind"]
+        WEB["Monitoreo + Simulación"]
     end
 
-    subgraph S3B ["Servicio 3B: App Android"]
-        AND["Android Studio (Java/Kotlin)"]
+    subgraph S3B ["Servicio 3B: App Android Nativa"]
+        AND["Botones + Alertas + Google Maps"]
     end
 
-    subgraph S4 ["Servicio 4: AI & Inferencia"]
+    subgraph S4 ["Servicio 4: Plug-and-Play AI"]
         JEV["TypeSafe Jev (80ms)"]
-        LLM["DeepSeek LLM"]
+        LLM["DeepSeek LLM (Chat Agronómico)"]
     end
 
-    PUB --> TOPIC_TEL
+    SENSORES -->|Publica Telemetría| TOPIC_TEL
     TOPIC_TEL --> API
     TOPIC_TEL --> AND
     TOPIC_TEL --> WEB
 
-    API --> TOPIC_CMD
-    TOPIC_CMD --> SUB
+    API -->|Publica Comandos| TOPIC_CMD
+    AND -.->|Comando Directo MQTT| TOPIC_CMD
+    TOPIC_CMD --> ACTUADORES
 
     AND <-->|HTTP REST| API
     WEB <-->|HTTP REST| API
-    API <-->|Inferencia Plug-and-Play| S4
+    API <-->|Inferencia Ciberfísica| S4
     API <--> DB
 ```
 
@@ -63,65 +65,71 @@ flowchart LR
 
 ## 2. Contratos de Datos (Pydantic v2 / Python)
 
-Estos esquemas gobiernan la validación de datos en el backend y sirven de modelo para las clases `Model` en Java/Kotlin y structs en C++.
+Estos modelos representan la realidad física del hardware actual, con capacidad de admitir extensiones futuras de forma transparente.
 
 ```python
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
-# -------------------------------------------------------------
-# 1. Perfil del Cultivo Activo (Bandeja Celular)
-# -------------------------------------------------------------
-class PlantProfile(BaseModel):
-    species_name: str = Field(default="Frutilla Hidropónica", description="Nombre de la especie")
-    ph_optimal_min: float = Field(default=5.5, ge=0.0, le=14.0)
-    ph_optimal_max: float = Field(default=6.5, ge=0.0, le=14.0)
-    ec_optimal_min_dsm: float = Field(default=1.2, ge=0.0, le=5.0, description="Conductividad eléctrica mínima en dS/m")
-    ec_optimal_max_dsm: float = Field(default=2.0, ge=0.0, le=5.0, description="Conductividad eléctrica máxima en dS/m")
-    water_temp_optimal_min_c: float = Field(default=18.0)
-    water_temp_optimal_max_c: float = Field(default=24.0)
-    recirculation_cycle_minutes: int = Field(default=15, description="Minutos de riego por ciclo")
-    recirculation_interval_hours: int = Field(default=2, description="Frecuencia de recirculación")
-
-# -------------------------------------------------------------
-# 2. Telemetría de la Bandeja (ESP32 -> Broker -> Backend)
-# -------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 1. Telemetría de Sensores Reales del MVP (ESP32 -> Broker -> Backend)
+# ------------------------------------------------------------------------------
 class TelemetryInput(BaseModel):
-    module_id: str = Field(default="celda-01", description="Identificador único de la bandeja")
+    module_id: str = Field(default="celda-01", description="Identificador único de la celda hidropónica")
     timestamp_utc: datetime = Field(default_factory=datetime.utcnow)
     
-    # Variables primarias (Sensores Físicos)
-    air_temperature_c: float = Field(..., ge=-10.0, le=60.0, description="Sensor DHT11 / DHT22")
-    air_humidity_percent: float = Field(..., ge=0.0, le=100.0, description="Sensor DHT11 / DHT22")
-    reservoir_level_percent: float = Field(..., ge=0.0, le=100.0, description="Nivel del estanque de solución")
+    # --- Sensores Físicos Reales Conectados al ESP32 ---
+    air_temperature_c: float = Field(..., ge=-10.0, le=60.0, description="Temperatura ambiental (DHT11 / BME280)")
+    air_humidity_percent: float = Field(..., ge=0.0, le=100.0, description="Humedad relativa aérea % (DHT11)")
+    barometric_pressure_hpa: float = Field(default=1013.25, ge=800.0, le=1200.0, description="Presión atmosférica (BME280/BMP280)")
+    reservoir_level_percent: float = Field(..., ge=0.0, le=100.0, description="Nivel de estanque (Sensor Resistivo GPIO 34 con pulso en 25)")
     
-    # Variables hidropónicas avanzadas (Físicas o Simuladas según kit)
-    ph_level: float = Field(default=6.0, ge=0.0, le=14.0, description="pH de la solución nutritiva")
-    ec_salinity_dsm: float = Field(default=1.5, ge=0.0, le=10.0, description="Salinidad en dS/m")
-    water_temperature_c: float = Field(default=20.5, ge=0.0, le=50.0, description="Temperatura del agua")
-    light_lux: Optional[float] = Field(default=450.0, ge=0.0, le=100000.0, description="Luz ambiental LDR")
+    # --- Métrica Fisiológica Calculada en Firmware o Backend ---
+    vpd_kpa: Optional[float] = Field(default=None, description="Déficit de Presión de Vapor calculado (kPa)")
     
-    # Estado del actuador
-    pump_active: bool = Field(default=False, description="Estado de la mini-bomba sumergible 5V")
+    # --- Estado de Actuadores Físicos en la Maqueta ---
+    pump_active: bool = Field(default=False, description="Estado de la mini-bomba sumergible 5V (Relé GPIO 26)")
+    vent_servo_angle: int = Field(default=0, ge=0, le=180, description="Ángulo del servo SG90 para ventilación (GPIO 18)")
+    stepper_dosing_steps: int = Field(default=0, description="Pasos acumulados en el motor 28BYJ-48 (ULN2003)")
 
-# -------------------------------------------------------------
-# 3. Comando hacia Actuador (Backend / App -> ESP32)
-# -------------------------------------------------------------
+    # --- Sensores Futuros (Opcionales / Fase 2 - No rompen si son None) ---
+    ph_level: Optional[float] = Field(default=None, ge=0.0, le=14.0, description="Sonda análoga de pH (Fase 2)")
+    ec_salinity_dsm: Optional[float] = Field(default=None, ge=0.0, le=10.0, description="Sonda de conductividad EC (Fase 2)")
+    light_lux: Optional[float] = Field(default=None, ge=0.0, le=100000.0, description="Sensor fotocelda LDR (Fase 2)")
+
+# ------------------------------------------------------------------------------
+# 2. Comando Hacia Actuadores Físicos (Backend / App Móvil -> ESP32)
+# ------------------------------------------------------------------------------
 class ActuatorCommand(BaseModel):
     module_id: str = Field(default="celda-01")
-    target: str = Field(default="bomba_riego", description="bomba_riego | iluminacion | valvula")
-    action: str = Field(..., description="ON | OFF | PULSE")
-    duration_seconds: Optional[int] = Field(default=0, description="Si es PULSE, duración en segundos")
-    triggered_by: str = Field(default="manual", description="manual | schedule | jev_rule | emergency")
+    target: str = Field(..., description="bomba_agua | servo_ventilacion | motor_nutrientes")
+    action: str = Field(..., description="ON | OFF | SET_ANGLE | DISPENSE_STEPS")
+    parameter_value: Optional[float] = Field(default=0.0, description="Ángulo (0-180°), pasos motor o duración en segundos")
+    triggered_by: str = Field(default="manual", description="manual_android | manual_web | jev_rule | schedule")
     timestamp_utc: datetime = Field(default_factory=datetime.utcnow)
 
-# -------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 3. Perfil de Cultivo de la Bandeja (Celda 01)
+# ------------------------------------------------------------------------------
+class PlantProfile(BaseModel):
+    species_name: str = Field(default="Frutilla Hidropónica", description="Especie cultivada")
+    optimal_temp_min_c: float = Field(default=18.0)
+    optimal_temp_max_c: float = Field(default=24.0)
+    optimal_humidity_min: float = Field(default=55.0)
+    optimal_humidity_max: float = Field(default=75.0)
+    optimal_vpd_min_kpa: float = Field(default=0.8, description="DPV mínimo para transpiración sana")
+    optimal_vpd_max_kpa: float = Field(default=1.2, description="DPV máximo antes de estrés hídrico")
+    recirculation_cycle_minutes: int = Field(default=15)
+    recirculation_interval_hours: int = Field(default=2)
+
+# ------------------------------------------------------------------------------
 # 4. Respuesta Inferencia Ciberfísica (TypeSafe Jev)
-# -------------------------------------------------------------
+# ------------------------------------------------------------------------------
 class JevDecisionResponse(BaseModel):
     action_required: bool
     recommended_pump_state: bool
+    recommended_vent_angle: int = 0
     reason: str
     risk_level: str = Field(default="NORMAL", description="NORMAL | WARNING | CRITICAL")
     execution_time_ms: float = Field(default=80.0)
@@ -130,163 +138,94 @@ class JevDecisionResponse(BaseModel):
 
 ---
 
-## 3. Especificación de Mensajería MQTT (HiveMQ Cloud)
+## 3. Jerarquía y Payloads MQTT (HiveMQ Cloud)
 
-El broker MQTT actúa como el bus de eventos en tiempo real desacoplado.
-
-### 3.1 Servidor y Credenciales:
-* **Host:** `broker.hivemq.com` (Público de pruebas) o Cluster HiveMQ Cloud TLS (`xxxx.hivemq.cloud:8883`).
-* **Transporte:** TCP (Port 1883 / 8883) y WebSockets (Port 8000 / 8884 con SSL).
-
-### 3.2 Jerarquía de Tópicos:
-
-| Tópico | Dirección | Emisor | Receptor | Descripción |
-| :--- | :--- | :--- | :--- | :--- |
-| `agrosense/telemetria/celda01` | Salida (Publish) | ESP32 / Gateway | Backend, Android, Web | Emisión periódica de sensores (cada 5 a 10s) |
-| `agrosense/comandos/celda01` | Entrada (Subscribe) | Backend / Android | ESP32 | Órdenes de conmutación de relé/bomba |
-| `agrosense/alertas/celda01` | Salida (Publish) | Backend / JEV | Android, Web | Alertas críticas (estanque vacío, pH anormal) |
-| `agrosense/estado/celda01` | Salida (LWT) | ESP32 | Backend, Dashboard | Estado de conectividad (`ONLINE` / `OFFLINE`) |
-
-### 3.3 Ejemplos de Payload JSON en MQTT:
-
-#### Payload de Telemetría (`agrosense/telemetria/celda01`):
+### 3.1 Tópico de Telemetría: `agrosense/telemetria/celda01`
+El ESP32 emite este JSON cada 5 a 10 segundos:
 ```json
 {
   "modulo": "celda-01",
-  "temperatura": 22.4,
-  "humedad": 58.2,
-  "nivel_estanque": 85.0,
-  "ph": 6.1,
-  "conductividad": 1.45,
-  "temp_agua": 20.8,
-  "luz_lux": 520,
+  "temp_ambiente": 22.4,
+  "humedad_ambiente": 60.5,
+  "presion_hpa": 1014.2,
+  "dpv_kpa": 1.05,
+  "nivel_estanque": 82.0,
   "bomba_activa": false,
+  "servo_angulo": 0,
   "timestamp": 1731336000
 }
 ```
 
-#### Payload de Comando (`agrosense/comandos/celda01`):
+### 3.2 Tópico de Comandos: `agrosense/comandos/celda01`
+El backend o la app Android publican órdenes hacia los 3 actuadores físicos:
+
+* **Para la Mini-Bomba Sumergible (Relé GPIO 26):**
 ```json
 {
-  "comando": "SET_PUMP",
-  "estado": "ON",
-  "duracion_segundos": 60,
-  "origen": "android_app_jonathan"
+  "actuador": "bomba_agua",
+  "accion": "ON",
+  "parametro": 60,
+  "origen": "android_app"
 }
 ```
 
-#### Payload de Alerta Crítica (`agrosense/alertas/celda01`):
+* **Para el Servomotor SG90 (Ventilación Cenital GPIO 18):**
+```json
+{
+  "actuador": "servo_ventilacion",
+  "accion": "SET_ANGLE",
+  "parametro": 90,
+  "origen": "jev_rules_engine"
+}
+```
+
+* **Para el Motor Paso a Paso 28BYJ-48 (Dosificador Nutrientes ULN2003):**
+```json
+{
+  "actuador": "motor_nutrientes",
+  "accion": "DISPENSE_STEPS",
+  "parametro": 512,
+  "origen": "manual_dashboard"
+}
+```
+
+### 3.3 Tópico de Alertas Críticas: `agrosense/alertas/celda01`
 ```json
 {
   "nivel": "CRITICAL",
-  "mensaje": "Nivel de estanque bajo (12%). Bomba bloqueada para evitar cavitación.",
-  "sensor": "reservoir_level",
-  "valor": 12.0,
+  "mensaje": "Estanque en nivel crítico (12%). Bomba apagada por seguridad.",
+  "actuador_bloqueado": "bomba_agua",
   "timestamp": 1731336025
 }
 ```
 
 ---
 
-## 4. Contratos de la API REST (Backend Cloud Hub)
-
-El backend de FastAPI expone una interfaz REST estándar para sincronización, persistencia histórica y orquestación de IA.
-
-### 4.1 Resumen de Endpoints:
+## 4. Endpoints REST de la API (Backend Cloud Hub)
 
 | Método | Endpoint | Descripción | Consumidor Principal |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Chequeo de salud del servicio | Monitoreo general |
-| `POST` | `/api/v1/telemetry` | Ingesta de lectura ambiental | ESP32 (HTTP fallback) o simulador |
-| `GET` | `/api/v1/telemetry/latest` | Última lectura registrada | Android, Web Dashboard |
-| `GET` | `/api/v1/telemetry/history?hours=24` | Histórico para gráficos | Dashboard Web, Android |
-| `POST` | `/api/v1/actuators/pump` | Encender / apagar bomba de 5V | App Android, Web Dashboard |
-| `GET` | `/api/v1/schedule` | Próximo ciclo de riego programado | App Android, Web Dashboard |
-| `POST` | `/api/v1/ai/consult` | Consulta agronómica al LLM | Chatbot Web, App Android |
+| `GET` | `/health` | Estado del backend, DB y broker | Monitoreo y Azure probe |
+| `POST` | `/api/v1/telemetry` | Ingesta de telemetría (vía HTTP de respaldo) | ESP32 o simulador de pruebas |
+| `GET` | `/api/v1/telemetry/latest` | Última lectura de sensores y actuadores | App Android, Dashboard Web |
+| `GET` | `/api/v1/telemetry/history?hours=24` | Histórico para gráficos temporales | Web y Reporte Semanal |
+| `POST` | `/api/v1/actuators/command` | Envío de orden a cualquier actuador (Bomba, Servo, Motor PaP) | App Android, Dashboard Web |
+| `GET` | `/api/v1/schedule` | Próximo ciclo programado de recirculación | App Android, Web |
+| `POST` | `/api/v1/ai/consult` | Consulta agronómica al LLM con datos en vivo | App Android, Chat Web |
 
 ---
 
-### 4.2 Detalle de Endpoints Críticos:
+## 5. Esquema de Base de Datos Relacional Adaptado (SQL DDL)
 
-#### A. Ingesta de Telemetría
-* **Ruta:** `POST /api/v1/telemetry`
-* **Request Body:**
-```json
-{
-  "module_id": "celda-01",
-  "air_temperature_c": 23.5,
-  "air_humidity_percent": 62.0,
-  "reservoir_level_percent": 75.0,
-  "ph_level": 6.2,
-  "ec_salinity_dsm": 1.6,
-  "water_temperature_c": 21.0,
-  "light_lux": 480.0,
-  "pump_active": false
-}
-```
-* **Response `200 OK`:**
-```json
-{
-  "status": "success",
-  "record_id": 1042,
-  "jev_evaluation": {
-    "action_required": false,
-    "recommended_pump_state": false,
-    "reason": "Parámetros hidropónicos dentro de rango óptimo.",
-    "risk_level": "NORMAL"
-  }
-}
-```
-
-#### B. Control de Actuador (Bomba 5V)
-* **Ruta:** `POST /api/v1/actuators/pump`
-* **Request Body:**
-```json
-{
-  "action": "ON",
-  "duration_seconds": 120,
-  "triggered_by": "android_user"
-}
-```
-* **Response `200 OK`:**
-```json
-{
-  "status": "command_published",
-  "module_id": "celda-01",
-  "target": "bomba_riego",
-  "new_state": true,
-  "message": "Comando enviado exitosamente vía MQTT al ESP32."
-}
-```
-
-#### C. Consulta Inteligente (Servicio 4: LLM DeepSeek)
-* **Ruta:** `POST /api/v1/ai/consult`
-* **Request Body:**
-```json
-{
-  "prompt": "¿Por qué el agua tiene temperatura alta y qué efecto tiene en las frutillas?",
-  "include_current_telemetry": true
-}
-```
-* **Response `200 OK`:**
-```json
-{
-  "answer": "La temperatura del agua registrada es 25.4°C. Para frutillas hidropónicas, temperaturas sobre 24°C disminuyen la concentración de oxígeno disuelto en la raíz, incrementando el riesgo de hongos patógenos (Pythium). Se recomienda recircular en horas más frescas o añadir solución fresca.",
-  "tokens_used": 142,
-  "source": "DeepSeek-V3 via OpenRouter"
-}
-```
-
----
-
-## 5. Esquema de Base de Datos Relacional (SQL DDL)
-
-Este script es ejecutable en **SQLite** (entorno de pruebas local) y en **PostgreSQL / Azure Database**. Cumple con los requisitos del Avance #4 (Semana 15) de *Integración de Competencias II*.
+Este esquema se diseñó bajo el principio **"Abierto a Extensión, Cerrado a Modificación"**:
+- Contiene columnas nativas para todo el hardware actual del MVP.
+- La tabla `registro_comandos` es **polimórfica**: soporta la bomba, el servo y el motor paso a paso sin modificar columnas.
+- Incluye campos `NULLABLE` para sensores de la Fase 2 (pH, EC, Luz) para que cuando se agreguen, no haya que rehacer la base de datos ni romper las aplicaciones.
 
 ```sql
 -- =============================================================================
 -- ESQUEMA DE BASE DE DATOS RELACIONAL: AGROSENSE AI (ASAI)
--- MODELO CELULAR PARA BANDEJA HIDROPÓNICA PILOTO 01
+-- COMPATIBLE CON SQLITE Y POSTGRESQL / AZURE
 -- =============================================================================
 
 -- 1. Tabla de Módulos Físicos
@@ -294,9 +233,9 @@ CREATE TABLE IF NOT EXISTS modulos_hidroponicos (
     id VARCHAR(50) PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT,
-    ubicacion_fisica VARCHAR(100) DEFAULT 'Laboratorio Sede Temuco',
-    ip_asignada VARCHAR(45),
-    broker_topic VARCHAR(100) NOT NULL,
+    ubicacion_fisica VARCHAR(100) DEFAULT 'Santo Tomás Temuco - Lab IoT',
+    broker_topic_telemetria VARCHAR(100) NOT NULL,
+    broker_topic_comandos VARCHAR(100) NOT NULL,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT 1
 );
@@ -305,61 +244,60 @@ CREATE TABLE IF NOT EXISTS modulos_hidroponicos (
 CREATE TABLE IF NOT EXISTS perfiles_cultivo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     especie VARCHAR(100) NOT NULL,
-    ph_min REAL NOT NULL DEFAULT 5.5,
-    ph_max REAL NOT NULL DEFAULT 6.5,
-    ec_min_dsm REAL NOT NULL DEFAULT 1.2,
-    ec_max_dsm REAL NOT NULL DEFAULT 2.0,
-    temp_agua_min REAL NOT NULL DEFAULT 18.0,
-    temp_agua_max REAL NOT NULL DEFAULT 24.0,
+    temp_min REAL NOT NULL DEFAULT 18.0,
+    temp_max REAL NOT NULL DEFAULT 24.0,
+    humedad_min REAL NOT NULL DEFAULT 55.0,
+    humedad_max REAL NOT NULL DEFAULT 75.0,
+    dpv_min_kpa REAL NOT NULL DEFAULT 0.8,
+    dpv_max_kpa REAL NOT NULL DEFAULT 1.2,
     recirculacion_minutos INTEGER DEFAULT 15,
     intervalo_riego_horas INTEGER DEFAULT 2
 );
 
--- 3. Tabla de Asociación Módulo - Cultivo
-CREATE TABLE IF NOT EXISTS asignacion_cultivo_modulo (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    modulo_id VARCHAR(50) NOT NULL,
-    perfil_id INTEGER NOT NULL,
-    fecha_siembra DATE DEFAULT CURRENT_DATE,
-    estado_cultivo VARCHAR(50) DEFAULT 'VEGETATIVO',
-    FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id),
-    FOREIGN KEY (perfil_id) REFERENCES perfiles_cultivo(id)
-);
-
--- 4. Tabla de Histórico de Telemetría (Series de Tiempo)
+-- 3. Tabla de Telemetría Histórica (Series Temporales del Hardware Real)
 CREATE TABLE IF NOT EXISTS telemetria_historica (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     modulo_id VARCHAR(50) NOT NULL,
     fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    temp_ambiente REAL NOT NULL,
-    humedad_ambiente REAL NOT NULL,
-    nivel_estanque REAL NOT NULL,
-    ph_solucion REAL,
-    conductividad_ec REAL,
-    temp_agua REAL,
-    luz_lux REAL,
-    bomba_encendida BOOLEAN DEFAULT 0,
+    
+    -- Variables Físicas Reales MVP
+    temp_ambiente REAL NOT NULL,          -- DHT11 / BME280
+    humedad_ambiente REAL NOT NULL,       -- DHT11
+    presion_atmosferica REAL NOT NULL,    -- BME280 / BMP280 (hPa)
+    dpv_kpa REAL,                         -- Déficit Presión de Vapor calculado
+    nivel_estanque REAL NOT NULL,         -- Sensor Resistivo GPIO 34/25 (%)
+    
+    -- Estado de Actuadores Físicos
+    bomba_encendida BOOLEAN DEFAULT 0,    -- Relé 5V (GPIO 26)
+    servo_angulo INTEGER DEFAULT 0,       -- SG90 PWM (GPIO 18, 0° a 180°)
+    pasos_motor_acumulados INTEGER DEFAULT 0, -- ULN2003 28BYJ-48
+    
+    -- Extensiones Futuras (NULLABLE - Se activan solo al conectar sondas)
+    ph_solucion REAL,                     -- Futuro: Sonda pH análoga
+    conductividad_ec REAL,                -- Futuro: Sonda EC
+    luz_lux REAL,                         -- Futuro: Fotocelda LDR
+    
     origen_dato VARCHAR(20) DEFAULT 'MQTT_ESP32',
     FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id)
 );
 
--- 5. Tabla de Registro de Comandos a Actuadores
+-- 4. Tabla Polimórfica de Comandos a Actuadores (Soporta N Actuadores)
 CREATE TABLE IF NOT EXISTS registro_comandos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     modulo_id VARCHAR(50) NOT NULL,
-    actuador VARCHAR(50) NOT NULL,
-    accion VARCHAR(20) NOT NULL,
-    duracion_segundos INTEGER DEFAULT 0,
-    disparado_por VARCHAR(50) NOT NULL, -- 'ANDROID_APP', 'WEB_DASHBOARD', 'JEV_RULE'
+    actuador VARCHAR(50) NOT NULL,         -- 'bomba_agua', 'servo_ventilacion', 'motor_nutrientes'
+    accion VARCHAR(50) NOT NULL,           -- 'ON', 'OFF', 'SET_ANGLE', 'DISPENSE_STEPS'
+    parametro_valor REAL DEFAULT 0.0,      -- 90 (grados), 512 (pasos), 60 (segundos)
+    disparado_por VARCHAR(50) NOT NULL,    -- 'ANDROID_APP', 'WEB_DASHBOARD', 'JEV_RULE'
     fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id)
 );
 
--- 6. Tabla de Registro de Alertas y Eventos Críticos
+-- 5. Tabla de Alertas y Eventos Críticos
 CREATE TABLE IF NOT EXISTS alertas_sistema (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     modulo_id VARCHAR(50) NOT NULL,
-    severidad VARCHAR(20) NOT NULL, -- 'INFO', 'WARNING', 'CRITICAL'
+    severidad VARCHAR(20) NOT NULL,        -- 'INFO', 'WARNING', 'CRITICAL'
     mensaje TEXT NOT NULL,
     leida BOOLEAN DEFAULT 0,
     fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -367,24 +305,18 @@ CREATE TABLE IF NOT EXISTS alertas_sistema (
 );
 
 -- =============================================================================
--- INSERCIÓN DE DATOS SEMILLA (SEED DATA PARA PRUEBAS INMEDIATAS)
+-- INSERCIÓN DE DATOS INICIALES (SEED DATA)
 -- =============================================================================
 
-INSERT OR IGNORE INTO modulos_hidroponicos (id, nombre, descripcion, ubicacion_fisica, broker_topic)
-VALUES ('celda-01', 'Bandeja Piloto 01', 'Prototipo hidropónico NFT de 1 nivel con recirculación', 'Santo Tomás Temuco - Lab IoT', 'agrosense/telemetria/celda01');
+INSERT OR IGNORE INTO modulos_hidroponicos (id, nombre, descripcion, broker_topic_telemetria, broker_topic_comandos)
+VALUES (
+    'celda-01', 
+    'Bandeja Piloto 01', 
+    'Prototipo hidropónico NFT de 1 nivel con ESP32, BME280, DHT11, Relé 5V, Servo SG90 y PaP ULN2003',
+    'agrosense/telemetria/celda01',
+    'agrosense/comandos/celda01'
+);
 
-INSERT OR IGNORE INTO perfiles_cultivo (especie, ph_min, ph_max, ec_min_dsm, ec_max_dsm, temp_agua_min, temp_agua_max, recirculacion_minutos, intervalo_riego_horas)
-VALUES ('Frutilla Hidropónica', 5.5, 6.5, 1.2, 2.0, 18.0, 24.0, 15, 2);
-
-INSERT OR IGNORE INTO asignacion_cultivo_modulo (modulo_id, perfil_id, estado_cultivo)
-VALUES ('celda-01', 1, 'FLORACIÓN');
+INSERT OR IGNORE INTO perfiles_cultivo (especie, temp_min, temp_max, humedad_min, humedad_max, dpv_min_kpa, dpv_max_kpa, recirculacion_minutos, intervalo_riego_horas)
+VALUES ('Frutilla Hidropónica', 18.0, 24.0, 55.0, 75.0, 0.8, 1.2, 15, 2);
 ```
-
----
-
-## 6. Resumen de Independencia Técnica
-
-Siguiendo esta especificación:
-1. **Compañero 1 (Hardware / IoT):** Programa su ESP32 para que publique exactamente el JSON de la sección 3.3 en `agrosense/telemetria/celda01` y se suscriba a `agrosense/comandos/celda01`.
-2. **Compañero 2 (Android):** Diseña su interfaz en Android Studio con botones que ejecuten `POST /api/v1/actuators/pump` o publiquen en MQTT, y tarjetas que muestren el JSON recibido.
-3. **Compañero 3 (Backend / Web / Base de Datos):** Levanta FastAPI, ejecuta el script DDL de la sección 5, valida con los esquemas Pydantic de la sección 2, y monta el Dashboard Web y la orquestación de IA.
