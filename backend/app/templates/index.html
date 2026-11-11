@@ -19,17 +19,8 @@
             mono: ['"JetBrains Mono"', 'monospace'],
           },
           colors: {
-            agro: {
-              400: '#34d399',
-              500: '#10b981',
-              600: '#059669',
-            },
-            tech: {
-              950: '#070a12',
-              900: '#0f172a',
-              800: '#1e293b',
-              700: '#334155',
-            }
+            agro: { 400: '#34d399', 500: '#10b981', 600: '#059669' },
+            tech: { 950: '#070a12', 900: '#0f172a', 800: '#1e293b', 700: '#334155' }
           }
         }
       }
@@ -54,7 +45,7 @@
         <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
           AgroSense AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">MVP Hidropónico v2.1</span>
         </h1>
-        <p class="text-xs text-gray-400">Hub Central SOA: ESP32 + BME280 + DHT11 + Bomba 5V + Servo SG90 + PaP</p>
+        <p class="text-xs text-gray-400">Hub SOA: ESP32 + Base de Datos SQLite + Calendario + JEV AI</p>
       </div>
     </div>
 
@@ -62,7 +53,7 @@
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 text-xs">
         <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
-        <span class="text-gray-300 font-mono">ESP32 DevKit V1 (Online)</span>
+        <span class="text-gray-300 font-mono">SQLite DB Activa</span>
       </div>
       <a href="/docs" target="_blank" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs transition shadow-lg shadow-emerald-500/20">
         API Swagger &rarr;
@@ -111,7 +102,7 @@
         </div>
 
         <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-gray-400">
-          🌱 <strong>Fórmula Hidráulica:</strong> Recirculación NFT temporizada con protección anti-cavitación.
+          🌱 <strong>Fórmula Hidráulica:</strong> Recirculación NFT con protección contra marcha en seco.
         </div>
       </div>
 
@@ -184,7 +175,7 @@
           <span class="text-3xl font-black font-mono {% if telemetry.air_temperature > plant.optimal_temp_max_c %}text-amber-400{% else %}text-white{% endif %}">
             {{ telemetry.air_temperature }}°C
           </span>
-          <span class="text-[10px] text-gray-500 block mt-1">DHT11 (GPIO 4) / BME280</span>
+          <span class="text-[10px] text-gray-500 block mt-1">DHT11 / BME280</span>
         </div>
 
         <!-- Humedad Aérea -->
@@ -216,8 +207,44 @@
       </div>
     </div>
 
-    <!-- Controles Manuales Directos y Simulador de Demostración -->
+    <!-- SECCIÓN CLAVE SEMANA 13: CALENDARIO DE RIEGO Y NOTIFICACIONES + CONTROLES MANUALES -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- TARJETA OFICIAL DE CALENDARIO DE RIEGO (Requisito Semana 13 IEI-094) -->
+      <div class="glass rounded-2xl p-6 border-t-4 border-amber-400">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-base font-bold text-white flex items-center gap-2">
+            <span>📅 Calendario de Recirculación y Notificación de Riego</span>
+          </h4>
+          <span class="text-xs px-2.5 py-1 rounded-full {% if schedule.status == 'BOMBEANDO' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/40{% else %}bg-amber-500/20 text-amber-300 border border-amber-500/40{% endif %} font-mono font-bold">
+            ● {{ schedule.status }}
+          </span>
+        </div>
+        <p class="text-xs text-gray-400 mb-4">Programación automática para la bandeja según necesidades de {{ plant.species_name }}:</p>
+
+        <div class="grid grid-cols-3 gap-3 mb-4 text-center">
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] text-gray-400 block">Frecuencia</span>
+            <span class="text-lg font-bold font-mono text-white">Cada {{ schedule.interval_hours }}h</span>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] text-gray-400 block">Duración</span>
+            <span class="text-lg font-bold font-mono text-emerald-400">{{ schedule.duration_minutes }} min</span>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] text-gray-400 block">Próximo Ciclo</span>
+            <span class="text-lg font-bold font-mono text-cyan-300">{{ schedule.next_cycle_time }}</span>
+          </div>
+        </div>
+
+        <div class="bg-amber-950/40 border border-amber-700/50 p-3 rounded-xl flex items-center gap-3 text-xs text-amber-200">
+          <span class="text-xl">🔔</span>
+          <div>
+            <span class="font-bold block">Notificación de Sistema:</span>
+            <span>{{ schedule.notification }}</span>
+          </div>
+        </div>
+      </div>
 
       <!-- Controles Manuales para los 3 Actuadores -->
       <div class="glass rounded-2xl p-6">
@@ -244,31 +271,82 @@
           Alimentación de actuadores: 5V DC regulado desde Arduino Uno R3 (Tierra común).
         </div>
       </div>
+    </div>
 
-      <!-- Simulador de Escenarios para Profesores y Jurados -->
-      <div class="glass rounded-2xl p-6">
-        <h4 class="text-base font-bold text-white mb-2 flex items-center gap-2">
-          <span>🧪 Simulador de Escenarios Ciberfísicos (Demostración)</span>
+    <!-- SECCIÓN CLAVE SEMANA 15: HISTORIAL DE TELEMETRÍA EN BASE DE DATOS SQLITE -->
+    <div class="glass rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="text-base font-bold text-white flex items-center gap-2">
+          <span>📊 Histórico de Telemetría Registrada (Base de Datos Relacional SQLite)</span>
         </h4>
-        <p class="text-xs text-gray-400 mb-4">Permite probar la respuesta de seguridad y la IA frente a los evaluadores:</p>
+        <span class="text-xs font-mono text-gray-400">Tabla: <code>telemetria_historica</code></span>
+      </div>
+      <p class="text-xs text-gray-400 mb-4">
+        Cada dato transmitido por el ESP32 queda guardado con marca temporal para auditoría y curvas agronómicas (Avance 4):
+      </p>
 
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <button onclick="runScenario('estanque_vacio')" class="px-4 py-2.5 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-700/60 text-red-200 text-xs font-bold transition">
-            ⚠️ Estanque Vacío (12%)
-          </button>
-          <button onclick="runScenario('calor_extremo')" class="px-4 py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 text-amber-200 text-xs font-bold transition">
-            🔥 Estrés Térmico (28.5°C)
-          </button>
-          <button onclick="runScenario('optimo')" class="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-200 text-xs font-bold transition">
-            ✅ Condiciones Óptimas
-          </button>
-          <button onclick="runScenario('recirculacion')" class="px-4 py-2.5 rounded-xl bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 text-blue-200 text-xs font-bold transition">
-            🌊 Ciclo Recirculación
-          </button>
-        </div>
-        <div class="text-[11px] text-gray-400 font-mono">
-          Simula perturbaciones en tiempo real para verificar la robustez del sistema.
-        </div>
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-gray-300">
+          <thead class="bg-slate-900 text-gray-400 font-mono uppercase text-[10px]">
+            <tr>
+              <th class="p-3"># ID</th>
+              <th class="p-3">Fecha y Hora</th>
+              <th class="p-3">Temp (°C)</th>
+              <th class="p-3">Humedad (%)</th>
+              <th class="p-3">Presión (hPa)</th>
+              <th class="p-3">DPV (kPa)</th>
+              <th class="p-3">Nivel Estanque</th>
+              <th class="p-3">Bomba 5V</th>
+              <th class="p-3">Servo</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800 bg-slate-950/60 font-mono">
+            {% for row in history %}
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="p-3 text-gray-500">#{{ row.id }}</td>
+              <td class="p-3 text-gray-300">{{ row.fecha_hora }}</td>
+              <td class="p-3 text-emerald-400 font-bold">{{ row.temp_ambiente }}°C</td>
+              <td class="p-3 text-cyan-300">{{ row.humedad_ambiente }}%</td>
+              <td class="p-3 text-purple-300">{{ row.presion_atmosferica }}</td>
+              <td class="p-3 text-amber-300">{{ row.dpv_kpa }}</td>
+              <td class="p-3 {% if row.nivel_estanque < 20 %}text-red-400 font-bold{% else %}text-emerald-400{% endif %}">
+                {{ row.nivel_estanque }}%
+              </td>
+              <td class="p-3">
+                {% if row.bomba_encendida %}
+                  <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">ON</span>
+                {% else %}
+                  <span class="px-2 py-0.5 rounded bg-slate-800 text-gray-400 text-[10px]">OFF</span>
+                {% endif %}
+              </td>
+              <td class="p-3 text-cyan-400">{{ row.servo_angulo }}°</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Simulador de Escenarios para Profesores y Jurados -->
+    <div class="glass rounded-2xl p-6">
+      <h4 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+        <span>🧪 Simulador de Escenarios Ciberfísicos (Demostración)</span>
+      </h4>
+      <p class="text-xs text-gray-400 mb-4">Permite probar la respuesta de seguridad y la IA frente a los evaluadores:</p>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+        <button onclick="runScenario('estanque_vacio')" class="px-4 py-2.5 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-700/60 text-red-200 text-xs font-bold transition">
+          ⚠️ Estanque Vacío (12%)
+        </button>
+        <button onclick="runScenario('calor_extremo')" class="px-4 py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 text-amber-200 text-xs font-bold transition">
+          🔥 Estrés Térmico (28.5°C)
+        </button>
+        <button onclick="runScenario('optimo')" class="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-200 text-xs font-bold transition">
+          ✅ Condiciones Óptimas
+        </button>
+        <button onclick="runScenario('recirculacion')" class="px-4 py-2.5 rounded-xl bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 text-blue-200 text-xs font-bold transition">
+          🌊 Ciclo Recirculación
+        </button>
       </div>
     </div>
 
@@ -278,11 +356,11 @@
         <span>💬 Habla con tu Celda Hidropónica (Asistente IA DeepSeek)</span>
       </h3>
       <p class="text-xs text-gray-400 mb-4">
-        Haz consultas agronómicas en lenguaje natural. El modelo responde fundamentado en los datos reales del ESP32:
+        Haz consultas agronómicas en lenguaje natural. El modelo responde fundamentado en los datos reales del ESP32 y la BD:
       </p>
 
       <div class="flex gap-3 mb-4">
-        <input id="chatInput" type="text" placeholder="Ej: ¿Por qué la bomba está detenida o cómo afecta el DPV actual a las frutillas?"
+        <input id="chatInput" type="text" placeholder="Ej: ¿Cuándo es el próximo riego o por qué es importante mantener el nivel sobre 20%?"
                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-sans">
         <button onclick="sendChat()" id="sendBtn"
                 class="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-sm transition shadow-lg shadow-emerald-500/20">
@@ -292,14 +370,14 @@
 
       <!-- Quick prompts -->
       <div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="askQuick('¿Cuándo es el próximo ciclo de riego y cuánto dura?')" class="text-xs px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300">
+          📅 ¿Próximo ciclo de riego?
+        </button>
         <button onclick="askQuick('¿Cuál es el estado del nivel de estanque y la bomba?')" class="text-xs px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300">
           💧 ¿Nivel y estado de la bomba?
         </button>
         <button onclick="askQuick('¿Está la temperatura y el DPV dentro de los rangos óptimos?')" class="text-xs px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300">
           🌡️ ¿Temp y DPV óptimos?
-        </button>
-        <button onclick="askQuick('¿Por qué es importante mantener el nivel de agua sobre 20%?')" class="text-xs px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-gray-300">
-          🛡️ ¿Por qué nivel &gt; 20%?
         </button>
       </div>
 
@@ -371,7 +449,7 @@
       btn.disabled = true;
       btn.innerText = 'Analizando...';
       box.classList.remove('hidden');
-      respP.innerText = 'Consultando telemetría del ESP32 y generando respuesta agronómica...';
+      respP.innerText = 'Consultando telemetría del ESP32 y base de datos relacional...';
 
       try {
         const res = await fetch('/api/v1/chat/farm', {
