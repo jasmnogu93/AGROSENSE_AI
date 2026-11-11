@@ -1,18 +1,40 @@
+# Bases de datos SQLite locales (se regeneran desde backend/app/database_schema.sql)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
 # Entornos virtuales Python
 .venv/
 backend/.venv/
 venv/
 env/
 
-# Archivos de caché de Python
+# Archivos de caché y pruebas Python
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Archivos binarios pesados (GitHub rechaza archivos > 100MB)
 *.ova
 *.iso
 *.vmdk
+*.mp4
+
+# Compilación Android / Arduino / IDE
+.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+.vscode/
+.idea/
+.workspace_anchor
 
 # Variables de entorno y secretos
 .env
