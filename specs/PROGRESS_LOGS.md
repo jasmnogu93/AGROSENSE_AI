@@ -1,7 +1,7 @@
 # PROGRESS_LOGS.md — Historial de Progreso y Trazabilidad SDD (AgroSense AI)
 
 > **Documento:** `specs/PROGRESS_LOGS.md`  
-> **Última Actualización:** 2026-11-13 16:53:00 (Chile / Temuco)  
+> **Última Actualización:** 2026-11-13 16:57:00 (Chile / Temuco)  
 > **Metodología:** Spec-Driven Development (SDD)  
 > **Líder de Registro:** `spec_lead` & `academic_compliance`
 
@@ -73,3 +73,4 @@
 | `2026-11-13 10:38` | `iot_firmware_engineer` / `qa_verification` | Implementación y verificación de suite de firmware ESP32 DevKit V1 en `firmware/` (`esp32_asai_mqtt.ino`, `libraries.txt`, `diagram.json`, `GUIA_RAPIDA_MIGUEL_ESP32.md`). | Verificación 100% exitosa: pinout exacto (DHT11 GPIO 4, VCC/ADC nivel GPIO 25/34 pulso 50 ms, relé GPIO 26, servo GPIO 18, PaP GPIO 19, 23, 5, 13 sin GPIO 12), broker `broker.emqx.io:1883`, sincronización de tópicos 1:1 con `ASAIapp` y MQTTX, fail-safe anti-cavitación `< 20%` y guía para Miguel. |
 | `2026-11-13 10:51` | `spec_lead` / `qa_verification` | Publicación en GitHub (`origin/main`, `origin/MiguelRama`, `origin/JonathanRama`) del paquete completo `ASAIapp/`, `firmware/` y especificaciones SDD actualizadas. | Repositorio sincronizado en GitHub para pruebas de hardware ESP32 + Android por Miguel. |
 | `2026-11-13 16:53` | `spec_lead` / `architect` | Optimización de `AGENTS.md` v3.0 (comandos exactos `pytest`/`uvicorn`/`gradlew`, contratos intocables, criterio `Plan/Execute` vs `swarm`), sincronización con kit global `MI_KIT_AGENTES_SDD`, actualización de `GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md` (`firmware/` y `ASAIapp/` implementados) y creación de guía didáctica con plantilla y ejemplos. | Documentación operativa y kit SDD verificados y publicados en GitHub. |
+| `2026-11-13 16:57` | `spec_lead` / `qa_verification` | Verificación de colaborador GitHub (`nacomantesmurf` / Marcos Bustos, rol `write`), creación de `GUIA_RAPIDA_MARCOS.md` (foco `AgroFieldService` / Integración II) y publicación de rama `MarcosRama` en GitHub. | Rama `origin/MarcosRama` creada y sincronizada junto a `main`, `MiguelRama` y `JonathanRama`. |
