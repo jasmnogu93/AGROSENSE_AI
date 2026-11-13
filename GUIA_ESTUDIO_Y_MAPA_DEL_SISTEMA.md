@@ -56,8 +56,8 @@ Guarda esta tabla para cuando sientas que algo anda mal, quieras cambiar un comp
 | Una tarjeta web se ve corrida, un botón no responde o falla cambiar entre las 3 pestañas | **Frontend Web Adaptativo** | `backend/app/templates/index.html` | [spec-005](specs/spec-005-frontend-adaptive-hub.md) (Secciones 1 y 2) |
 | Los botones **"Simular Estanque Vacío / Calor"**, la evaluación **JEV** o el **Chat Botánico** fallan | **IA y Simulación** | `backend/app/main.py` (`evaluate_jev_local`, `simulate_scenario`, `chat_with_farm`) | [spec-006](specs/spec-006-ai-and-simulation.md) (Secciones 1 a 4) |
 | El backend rechaza el JSON del sensor (Error 422) o calcula raro el **DPV** | **Contratos y Fórmula DPV** | `backend/app/models.py` (`TelemetryInput`) y `backend/app/db.py` (`calculate_vpd`) | [spec-001](specs/spec-001-architecture-overview.md) (Secciones 3.3 y 3.4) |
-| Un sensor físico (**DHT11, BME280, Nivel**) no lee o un pin del **ESP32** no reacciona | **Hardware / Firmware** *(Por crear)* | Futura carpeta `firmware/` | [spec-007](specs/spec-007-esp32-firmware.md) (Secciones 2, 3 y 4) |
-| La **App Android (`ASAIapp`)** no conecta al broker MQTT, no actualiza tarjetas o falta el mapa GPS | **App Móvil** *(Por crear)* | Carpeta `ASAIapp/` | [spec-008](specs/spec-008-android-app.md) (Secciones 1, 2 y 3) |
+| Un sensor físico (**DHT11, Nivel**) no lee o un pin del **ESP32** no reacciona | **Hardware / Firmware** | `firmware/esp32_asai_mqtt/esp32_asai_mqtt.ino` y `firmware/GUIA_RAPIDA_MIGUEL_ESP32.md` | [spec-007](specs/spec-007-esp32-firmware.md) (Secciones 2, 3 y 4) |
+| La **App Android (`ASAIapp`)** no conecta al broker MQTT o no actualiza tarjetas | **App Móvil** | `ASAIapp/app/src/main/java/com/example/asaiapp/MainActivity.java` y `activity_main.xml` | [spec-008](specs/spec-008-android-app.md) (Secciones 1, 2 y 3) |
 | No sabes en qué orden debe trabajar el equipo de IA o qué está terminado y qué falta | **Gobierno del Proyecto** | `AGENTS.md` y `specs/PROGRESS_LOGS.md` | [AGENTS.md](AGENTS.md) y [PROGRESS_LOGS.md](specs/PROGRESS_LOGS.md) |
 
 ---
@@ -136,22 +136,22 @@ Guarda esta tabla para cuando sientas que algo anda mal, quieras cambiar un comp
 
 ---
 
-### 3.5. Hardware IoT (`ESP32 DevKit V1 + Arduino Uno R3`) — *Siguiente Fase de Construcción*
-* **¿Qué hará?** Leerá sensores reales cada pocos segundos (Temperatura/Humedad con **DHT11**, Presión/Temperatura con **BME280**, Nivel de agua con **sensor resistivo**), enviará los datos por Wi-Fi (**MQTT / HTTP**) al servidor, ejecutará órdenes (encender **mini-bomba 5V**, mover **servo SG90**, dosificar con **motor PaP 28BYJ-48**) y cortará la bomba localmente si falta agua.
-* **¿Por qué integraremos estos trucos de ingeniería?**
-  * **Arduino Uno R3 solo como fuente 5V (con `GND` unido):** Los motores consumen mucha corriente; si los conectas directo al ESP32, este se reinicia o se quema.
+### 3.5. Hardware IoT (`ESP32 DevKit V1 + Arduino Uno R3`) — *Implementado en `firmware/`*
+* **¿Qué hace?** Lee sensores reales cada 3 segundos de forma no bloqueante con `millis()` (**DHT11** en `GPIO 4` y **sensor resistivo de nivel** en `GPIO 34`), calcula el **DPV (Tetens)**, publica en vivo por Wi-Fi (**MQTT**) hacia `broker.emqx.io:1883`, escucha órdenes para accionar **mini-bomba 5V** (`GPIO 26`), **servo SG90** (`GPIO 18`) y **motor PaP 28BYJ-48** (`GPIO 19, 23, 5, 13`) y corta la bomba localmente si falta agua (`< 20%`).
+* **¿Por qué integra estos trucos de ingeniería?**
+  * **Arduino Uno R3 solo como fuente 5V externa (con `GND` unido):** Los motores consumen mucha corriente; si los conectas directo al regulador del ESP32, este se reinicia o se quema.
   * **Pulso de `50 ms` en `GPIO 25` antes de leer `GPIO 34`:** Si dejas el sensor de agua energizado todo el día, el cobre se corroe en horas por electrólisis; prenderlo solo 50 milisegundos al leer hace que dure meses.
   * **Pines `GPIO 19, 23, 5, 13` para el motor PaP:** Se evita `GPIO 12` porque en el ESP32 ese pin decide el voltaje de memoria al encender y puede impedir que arranque.
-* **¿A quién le sirve?** Rinde al 100% en **Internet de las Cosas (IEI-059 - Prof. Nicole Ortega)** (`<PubSubClient.h>`, `<DHT.h>`, Monitor Serial) y alimenta datos reales a Integración II y Feria.
-* **¿Dónde estará y qué SDD revisar?** En futura carpeta `firmware/`, siguiendo al pie de la letra [specs/spec-007-esp32-firmware.md](specs/spec-007-esp32-firmware.md) y [INVENTARIO_HARDWARE_Y_MAPEO_PINES_MVP.md](ProyectoServiciosASAI/INVENTARIO_HARDWARE_Y_MAPEO_PINES_MVP.md).
+* **¿A quién le sirve?** Rinde al 100% en **Internet de las Cosas (IEI-059 - Prof. Nicole Ortega)** (`<PubSubClient.h>`, `<DHT.h>`, `<ESP32Servo.h>`, `<Stepper.h>`) y habilita pruebas físicas o en Wokwi.
+* **¿Dónde está y qué SDD revisar?** En [firmware/esp32_asai_mqtt/esp32_asai_mqtt.ino](firmware/esp32_asai_mqtt/esp32_asai_mqtt.ino), [diagram.json](firmware/esp32_asai_mqtt/diagram.json) y [GUIA_RAPIDA_MIGUEL_ESP32.md](firmware/GUIA_RAPIDA_MIGUEL_ESP32.md), siguiendo [specs/spec-007-esp32-firmware.md](specs/spec-007-esp32-firmware.md) y [INVENTARIO_HARDWARE_Y_MAPEO_PINES_MVP.md](ProyectoServiciosASAI/INVENTARIO_HARDWARE_Y_MAPEO_PINES_MVP.md).
 
 ---
 
-### 3.6. Aplicación Móvil Nativa (`ASAIapp` en Android Studio) — *Siguiente Fase de Construcción*
-* **¿Qué hará?** Mostrará en vivo las mismas métricas del Dashboard Web (temperatura, humedad, nivel del estanque, DPV, presión y estado de bomba) en tarjetas `CardView`, permitirá encender/apagar la bomba, mover la ventilación SG90 y dosificar nutrientes publicando por MQTT, además de mostrar el mapa con **Google Maps SDK** requerido en clases.
-* **¿Por qué existe y a quién sirve?** Le da portabilidad real al usuario de casa en la **Feria de Innovación** y cumple al 100% los entregables evaluados de **Programación Android (`IEI-058`)** y **IoT (`IEI-059`)** de la Prof. Nicole Ortega (`Android + mqtt.pdf`).
-* **¿Con qué herramientas funcionará?** **Android Studio (`Empty Views Activity`, Java)** con **Eclipse Paho MQTT (`MqttAsyncClient`)**, **`LocalBroadcastManager` + `BroadcastReceiver`**, tarjetas **`CardView`** (AndroidX + Jetifier) conectado a **`broker.emqx.io:1883`** (verificable en vivo con **MQTTX**) y Google Maps SDK en pantalla secundaria.
-* **¿Dónde estará y qué SDD revisar?** En `ASAIapp/`, guiado por [specs/spec-008-android-app.md](specs/spec-008-android-app.md) y [specs/spec-009-academic-standards-and-tools.md](specs/spec-009-academic-standards-and-tools.md).
+### 3.6. Aplicación Móvil Nativa (`ASAIapp` en Android Studio) — *Implementada y Compilada*
+* **¿Qué hace?** Muestra en vivo las métricas de `HomeTowerService` (temperatura, humedad, nivel del estanque, DPV, presión y estado de bomba) en tarjetas `CardView`, permite encender/apagar la bomba (con bloqueo visual si el nivel `< 20%`), mover la ventilación SG90 y dosificar nutrientes publicando por MQTT hacia el mismo broker que el ESP32 y MQTTX.
+* **¿Por qué existe y a quién sirve?** Le da control móvil real al usuario de casa en la **Feria de Innovación** y cumple los entregables evaluados de **Programación Android (`IEI-058`)** e **IoT (`IEI-059`)** de la Prof. Nicole Ortega (`Android + mqtt.pdf`).
+* **¿Con qué herramientas funciona?** **Android Studio (`Empty Views Activity`, Java)** con **Eclipse Paho MQTT (`MqttAsyncClient`)**, **`LocalBroadcastManager` + `BroadcastReceiver`**, tarjetas **`CardView`** (AndroidX + Jetifier) conectado a **`tcp://broker.emqx.io:1883`** con tópicos `ASAI/*` verificables en vivo con **MQTTX**.
+* **¿Dónde está y qué SDD revisar?** En [ASAIapp/app/src/main/java/com/example/asaiapp/MainActivity.java](ASAIapp/app/src/main/java/com/example/asaiapp/MainActivity.java) y [activity_main.xml](ASAIapp/app/src/main/res/layout/activity_main.xml), guiado por [specs/spec-008-android-app.md](specs/spec-008-android-app.md) y [specs/spec-009-academic-standards-and-tools.md](specs/spec-009-academic-standards-and-tools.md).
 
 ---
 
