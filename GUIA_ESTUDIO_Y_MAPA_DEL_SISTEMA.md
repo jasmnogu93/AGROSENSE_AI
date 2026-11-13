@@ -27,16 +27,17 @@ flowchart TB
 
     subgraph INTERFACES["4. Pantallas y Cerebro Extra"]
         WEB["🖥️ Web Adaptativa (index.html)"]
-        AND["📱 App Android Nativa"]
+        AND["📱 ASAIapp (Android + Paho MQTT)"]
         IA["🤖 IA Enchufable (JEV + DeepSeek)<br/><i>Solo aconseja; nunca manda sobre seguridad</i>"]
     end
 
     ESP <-->|Wi-Fi HTTP / MQTT| HUB
+    ESP <-->|MQTT broker.emqx.io| AND
     HUB --> S1
     HUB --> S2
     HUB --> S3
     S1 & S2 & S3 --> WEB
-    S2 --> AND
+    S2 -.->|Mismas métricas| AND
     HUB <-->|Opcional / Plug-and-Play| IA
 ```
 
@@ -56,7 +57,7 @@ Guarda esta tabla para cuando sientas que algo anda mal, quieras cambiar un comp
 | Los botones **"Simular Estanque Vacío / Calor"**, la evaluación **JEV** o el **Chat Botánico** fallan | **IA y Simulación** | `backend/app/main.py` (`evaluate_jev_local`, `simulate_scenario`, `chat_with_farm`) | [spec-006](specs/spec-006-ai-and-simulation.md) (Secciones 1 a 4) |
 | El backend rechaza el JSON del sensor (Error 422) o calcula raro el **DPV** | **Contratos y Fórmula DPV** | `backend/app/models.py` (`TelemetryInput`) y `backend/app/db.py` (`calculate_vpd`) | [spec-001](specs/spec-001-architecture-overview.md) (Secciones 3.3 y 3.4) |
 | Un sensor físico (**DHT11, BME280, Nivel**) no lee o un pin del **ESP32** no reacciona | **Hardware / Firmware** *(Por crear)* | Futura carpeta `firmware/` | [spec-007](specs/spec-007-esp32-firmware.md) (Secciones 2, 3 y 4) |
-| La **App Android** no conecta con el backend, no notifica o falta el mapa GPS | **App Móvil** *(Por crear)* | Carpeta `Programacion Android/` | [spec-008](specs/spec-008-android-app.md) (Secciones 2 y 3) |
+| La **App Android (`ASAIapp`)** no conecta al broker MQTT, no actualiza tarjetas o falta el mapa GPS | **App Móvil** *(Por crear)* | Carpeta `ASAIapp/` | [spec-008](specs/spec-008-android-app.md) (Secciones 1, 2 y 3) |
 | No sabes en qué orden debe trabajar el equipo de IA o qué está terminado y qué falta | **Gobierno del Proyecto** | `AGENTS.md` y `specs/PROGRESS_LOGS.md` | [AGENTS.md](AGENTS.md) y [PROGRESS_LOGS.md](specs/PROGRESS_LOGS.md) |
 
 ---
@@ -146,11 +147,11 @@ Guarda esta tabla para cuando sientas que algo anda mal, quieras cambiar un comp
 
 ---
 
-### 3.6. Aplicación Móvil Nativa (`Android Studio`) — *Siguiente Fase de Construcción*
-* **¿Qué hará?** Permitirá ver desde el celular la temperatura, humedad y nivel del estanque de la Mini Torre, encender/apagar la bomba y abrir la ventilación, recibir alertas locales cuando falte agua o toque regar, y mostrar el módulo de **Google Maps SDK** requerido en clases.
-* **¿Por qué existe y a quién sirve?** Le da portabilidad real al usuario de casa en la **Feria de Innovación** y cubre los entregables evaluados de **Programación Android (IEI-058 - Prof. Nicole Ortega)** (control tipo *NodeMCU + Android* y actividad de *Semana 13 GPS*).
-* **¿Con qué herramientas funcionará?** **Android Studio (Kotlin / Java)** consumiendo endpoints REST del backend (o HTTP local `/encender`, `/apagar` directo al ESP32), `NotificationCompat` para avisos y Google Maps SDK.
-* **¿Dónde estará y qué SDD revisar?** En [Programacion Android/](Programacion%20Android/), guiado por [specs/spec-008-android-app.md](specs/spec-008-android-app.md).
+### 3.6. Aplicación Móvil Nativa (`ASAIapp` en Android Studio) — *Siguiente Fase de Construcción*
+* **¿Qué hará?** Mostrará en vivo las mismas métricas del Dashboard Web (temperatura, humedad, nivel del estanque, DPV, presión y estado de bomba) en tarjetas `CardView`, permitirá encender/apagar la bomba, mover la ventilación SG90 y dosificar nutrientes publicando por MQTT, además de mostrar el mapa con **Google Maps SDK** requerido en clases.
+* **¿Por qué existe y a quién sirve?** Le da portabilidad real al usuario de casa en la **Feria de Innovación** y cumple al 100% los entregables evaluados de **Programación Android (`IEI-058`)** y **IoT (`IEI-059`)** de la Prof. Nicole Ortega (`Android + mqtt.pdf`).
+* **¿Con qué herramientas funcionará?** **Android Studio (`Empty Views Activity`, Java)** con **Eclipse Paho MQTT (`MqttAsyncClient`)**, **`LocalBroadcastManager` + `BroadcastReceiver`**, tarjetas **`CardView`** (AndroidX + Jetifier) conectado a **`broker.emqx.io:1883`** (verificable en vivo con **MQTTX**) y Google Maps SDK en pantalla secundaria.
+* **¿Dónde estará y qué SDD revisar?** En `ASAIapp/`, guiado por [specs/spec-008-android-app.md](specs/spec-008-android-app.md) y [specs/spec-009-academic-standards-and-tools.md](specs/spec-009-academic-standards-and-tools.md).
 
 ---
 

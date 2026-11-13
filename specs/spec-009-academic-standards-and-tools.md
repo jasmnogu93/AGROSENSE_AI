@@ -11,79 +11,101 @@
 ## 1. Programación Android (`IEI-058`) — Estándar Oficial de Clase
 
 ### 1.1. Configuración Obligatoria del Proyecto en Android Studio
-Al crear el proyecto en Android Studio (`New Project`), respetar exactamente esta configuración enseñada en clases:
+Al crear el proyecto `ASAIapp` en Android Studio (`New Project`), respetar exactamente esta configuración enseñada en clases:
+* **Carpeta del proyecto en el repositorio:** `ASAIapp/`
 * **Plantilla:** `Empty Views Activity` *(NO usar Jetpack Compose ni Empty Activity de Compose)*.
 * **Lenguaje:** **Java** *(NO usar Kotlin)*.
-* **Minimum SDK:** `API 24 ("Nougat"; Android 7.0)`.
+* **Minimum SDK:** `API 24 ("Nougat"; Android 7.0)` *(o `API 21+` según plantilla)*.
 * **Build configuration language:** `Kotlin DSL (build.gradle.kts) [Recommended]`.
 
-### 1.2. Estructura de Interfaz (XML), Colores y Enlace de Vistas
-* **Actividad base:** `public class MainActivity extends AppCompatActivity`
-* **Enlace de controles:** Uso clásico con `findViewById(R.id.xxx)` dentro de `onCreate` o un método `private void init()` *(sin ViewBinding ni DataBinding)*.
-* **Colores estándar de semáforo (`res/values/colors.xml` — Semana 10):**
+### 1.2. Estructura de Interfaz (XML), Widgets Permitidos y Colores
+Solo usar componentes y patrones enseñados explícitamente en clases (`Semana 2`, `Semana 4`, `Semana 10`, `Android + mqtt.pdf`):
+* **Layouts permitidos:** `ConstraintLayout`, `LinearLayout` y `TableLayout` / `TableRow`.
+* **Tarjetas de métricas (`Android + mqtt.pdf`):** `androidx.cardview.widget.CardView` con `app:cardCornerRadius="12dp"`, `android:elevation="8dp"` y `android:layout_margin="16dp"`, conteniendo un `LinearLayout` horizontal con `ImageView` (`40dp` x `40dp`) y `TextView` (`20sp`, `android:fontFamily="sans-serif-medium"`).
+* **Widgets básicos permitidos:** `TextView`, `ImageView`, `Button` (con `android:backgroundTint` y `android:onClick` o `setOnClickListener`), `ProgressBar`, `CheckBox`, `EditText`.
+* **Actividad base y enlace de vistas:** `public class MainActivity extends AppCompatActivity` usando `findViewById(R.id.xxx)` dentro de `onCreate` *(sin ViewBinding ni DataBinding)*.
+* **Navegación entre pantallas:** `Intent i = new Intent(this, OtraActivity.class); startActivity(i);`.
+* **Colores estándar (`res/values/colors.xml` — Semana 10 y `Android + mqtt.pdf`):**
   ```xml
   <color name="gris">#605F5F</color>
   <color name="Verde">#4CAF50</color>
   <color name="Amarillo">#FFC107</color>
   <color name="Rojo">#F30606</color>
-  ```
-* **Manejo de eventos de botones:**
-  * Mediante listener: `btn.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { ... } });`
-  * O mediante atributo `android:onClick="Start"` en XML con firma `public void Start(View view)` en Java.
-
-### 1.3. Concurrencia, Hilos y Actualización en Tiempo Real (Semana 10)
-* Para tareas repetitivas, lecturas periódicas o red, **no** bloquear el hilo principal ni introducir Coroutines/RxJava.
-* Usar el patrón estándar de clase con `new Thread(new Runnable())` y `runOnUiThread(new Runnable())`:
-  ```java
-  new Thread(new Runnable() {
-      @Override
-      public void run() {
-          while (iniciar) {
-              // Lógica o lectura periódica en segundo plano
-              runOnUiThread(new Runnable() {
-                  @Override
-                  public void run() {
-                      // Actualizar TextView o colores desde el hilo principal
-                  }
-              });
-              try {
-                  Thread.sleep(1000);
-              } catch (InterruptedException e) {
-                  e.printStackTrace();
-              }
-          }
-      }
-  }).start();
+  <color name="tempNaranja">#FF5722</color>
+  <color name="humedadCeleste">#03A9F4</color>
   ```
 
-### 1.4. Conexión HTTP con Microcontrolador / Backend (`NodeMCU + Android.pdf`)
+### 1.3. Estándar Oficial de Conectividad `Android + MQTT` (`Android + mqtt.pdf`)
+La comunicación principal en vivo entre la app Android y el ecosistema IoT debe implementarse con **Eclipse Paho MQTT** y **`LocalBroadcastManager`**:
+
 1. **Permiso en `AndroidManifest.xml`:**
    ```xml
    <uses-permission android:name="android.permission.INTERNET" />
    ```
-2. **Tráfico HTTP local sin HTTPS (`res/xml/network_security_config.xml`):**
-   Referenciar en `<application android:networkSecurityConfig="@xml/network_security_config">`:
-   ```xml
-   <?xml version="1.0" encoding="utf-8"?>
-   <network-security-config>
-       <base-config cleartextTrafficPermitted="true" />
-       <domain-config cleartextTrafficPermitted="true">
-           <domain includeSubdomains="true">192.168.1.20</domain>
-           <domain includeSubdomains="true">10.0.2.2</domain>
-       </domain-config>
-   </network-security-config>
+2. **Catálogo de versiones (`gradle/libs.versions.toml`):**
+   ```toml
+   [versions]
+   pahoMqttClient = "1.2.5"
+   pahoMqttAndroidService = "1.1.1"
+   androidx_localbroadcastmanager = "1.0.0"
+
+   [libraries]
+   paho-mqtt-client = { module = "org.eclipse.paho:org.eclipse.paho.client.mqttv3", version.ref = "pahoMqttClient" }
+   paho-mqtt-android = { module = "org.eclipse.paho:org.eclipse.paho.android.service", version.ref = "pahoMqttAndroidService" }
+   localbroadcastmanager = "androidx.localbroadcastmanager:localbroadcastmanager:${versions.androidx_localbroadcastmanager}"
    ```
-3. **Cliente HTTP nativo en Java:**
-   Usar `java.net.URL` y `java.net.HttpURLConnection` (`setRequestMethod("GET")` o `"POST"`, `connect()`, `getResponseCode()`) dentro de `new Thread(new Runnable())`, mostrando retroalimentación con `Toast.makeText(MainActivity.this, "...", Toast.LENGTH_SHORT).show()` dentro de `runOnUiThread`.
+3. **Dependencias y compatibilidad Java 8 (`app/build.gradle.kts`):**
+   ```kotlin
+   compileOptions {
+       sourceCompatibility = JavaVersion.VERSION_1_8
+       targetCompatibility = JavaVersion.VERSION_1_8
+   }
+
+   dependencies {
+       implementation(libs.paho.mqtt.client)
+       implementation(libs.paho.mqtt.android)
+       implementation(libs.localbroadcastmanager)
+   }
+   ```
+4. **Activación obligatoria de AndroidX y Jetifier (`gradle.properties`):**
+   ```properties
+   android.useAndroidX=true
+   android.enableJetifier=true
+   ```
+   *(Indispensable para que `org.eclipse.paho.android.service` compile y opere con `androidx`).*
+5. **Imports estándar en `MainActivity.java`:**
+   ```java
+   import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+   import org.eclipse.paho.client.mqttv3.IMqttActionListener;
+   import org.eclipse.paho.client.mqttv3.IMqttToken;
+   import org.eclipse.paho.client.mqttv3.MqttCallback;
+   import org.eclipse.paho.client.mqttv3.MqttClient;
+   import org.eclipse.paho.client.mqttv3.MqttException;
+   import org.eclipse.paho.client.mqttv3.MqttMessage;
+   import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+   import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+   import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
+   ```
+6. **Flujo obligatorio en `MainActivity.java`:**
+   * En `onCreate`: inicializar vistas con `findViewById`, llamar a `connectToMqtt()` y registrar el receptor local con:
+     `LocalBroadcastManager.getInstance(this).registerReceiver(mqttReceiver, new IntentFilter("mqtt_data"));`
+   * En `connectToMqtt()`: instanciar `new MqttAsyncClient("tcp://broker.emqx.io:1883", clientId, null)`, configurar `MqttConnectOptions` con `options.setCleanSession(true);`, conectar con `IMqttActionListener` (`onSuccess` -> `subscribeToTopics()`, `onFailure` -> `Log.e(...)`) y asignar `mqttClient.setCallback(new MqttCallback() { ... })`.
+   * En `messageArrived(String topic, MqttMessage message)`: crear `Intent intent = new Intent("mqtt_data");`, discriminar por `topic.equals(...)`, adjuntar el valor con `intent.putExtra(...)` y emitir con `LocalBroadcastManager.getInstance(MainActivity.this).sendBroadcast(intent);`.
+   * En `BroadcastReceiver mqttReceiver`: leer `intent.getStringExtra(...)` dentro de `onReceive` y actualizar los `TextView` correspondientes (y publicar comandos a actuadores con `mqttClient.publish(...)`).
+   * En `onDestroy()`: desregistrar `mqttReceiver` con `LocalBroadcastManager.getInstance(this).unregisterReceiver(mqttReceiver);` y desconectar `mqttClient.disconnect();`.
+
+### 1.4. Patrones Complementarios de Clase (Hilos y HTTP Local)
+* **Hilos clásicos (Semana 10):** Si se requieren tareas periódicas fuera de MQTT, usar `new Thread(new Runnable())` + `runOnUiThread(new Runnable())` *(sin Coroutines ni RxJava)*.
+* **HTTP local de referencia (`NodeMCU + Android.pdf`):** `java.net.URL` + `HttpURLConnection` con `res/xml/network_security_config.xml` (`cleartextTrafficPermitted="true"`) y retroalimentación vía `Toast.makeText(...)`.
 
 ### 1.5. Multimedia y Geolocalización (`Semana 13 GPS + Instrucciones.pdf`)
-* **Video local o remoto:** Widget `<VideoView>` en `activity_main.xml` + `MediaController` (`mediaController.setAnchorView(...)`), cargando recursos locales desde `res/raw/` con `"android.resource://" + getPackageName() + "/" + R.raw.nombre_video` o URL directa.
+* **Video local o remoto:** Widget `<VideoView>` en XML + `MediaController` (`mediaController.setAnchorView(...)`), cargando recursos locales desde `res/raw/` con `"android.resource://" + getPackageName() + "/" + R.raw.nombre_video` o URL directa.
 * **Google Maps SDK:**
   * Dependencia en `build.gradle.kts` (`Module :app`):
     `implementation("com.google.android.gms:play-services-maps:18.1.0")`
   * `<meta-data android:name="com.google.android.geo.API_KEY" android:value="..." />` en `AndroidManifest.xml`.
   * Fragmento `<fragment android:id="@+id/maps" android:name="com.google.android.gms.maps.SupportMapFragment" ... />`.
-  * En `MainActivity`: implementar `OnMapReadyCallback`, `GoogleMap.OnMapClickListener` y `GoogleMap.OnMapLongClickListener`, usando `getMapAsync(this)`, `LatLng`, `MarkerOptions` y `CameraUpdateFactory.newLatLng(...)`.
+  * En la Activity del mapa: implementar `OnMapReadyCallback`, `GoogleMap.OnMapClickListener` y `GoogleMap.OnMapLongClickListener`, usando `getMapAsync(this)`, `LatLng`, `MarkerOptions` y `CameraUpdateFactory.newLatLng(...)`.
 
 ---
 
@@ -94,14 +116,14 @@ Al crear el proyecto en Android Studio (`New Project`), respetar exactamente est
 * **Wokwi Simulator (`sketch.ino`, `diagram.json`, `libraries.txt`):** Entorno de simulación para diseñar circuitos y probar firmware **ESP32** mientras no se cuente con la placa física.
 * **MQTTX:** Cliente de escritorio para comprobar publicación y suscripción de tópicos (`Plaintext`, `QoS 0`, `Keep Alive: 60`).
 
-### 2.2. Patrón MQTT de Clase (`DHT11 + MQTT.pdf` y `Semana 8.pdf`)
+### 2.2. Patrón MQTT de Clase (`DHT11 + MQTT.pdf`, `Semana 8.pdf` y `Android + mqtt.pdf`)
 * **Librerías estándar:** `<WiFi.h>` (en ESP32), `<PubSubClient.h>`, `<DHT.h>`.
-* **Brokers públicos usados en clase:** `broker.emqx.io` o `broker.hivemq.com` en puerto **`1883`**.
+* **Broker público oficial:** **`broker.emqx.io`** en puerto **`1883`** *(verificado en **MQTTX** con `Plaintext`, `QoS 0`, `Keep Alive: 60`, `Clean Start: true`)*.
 * **Estructura modular esperada en el `.ino`:**
   1. `setup_wifi()`: inicia `WiFi.begin(ssid, password)` y espera `WL_CONNECTED` con `delay(500)`/`delay(1000)` imprimiendo IP asignada (`WiFi.localIP()`).
-  2. `reconnect()`: bucle `while (!client.connected())` con `client.connect(mqtt_client_name)` y espera de `5000 ms` entre reintentos.
-  3. `setup()`: `Serial.begin(115200);`, inicialización de sensores (`dht.begin()`), `setup_wifi()` y `client.setServer(mqtt_server, mqtt_port)`.
-  4. `loop()`: asegura conexión (`if (!client.connected()) reconnect(); client.loop();`), valida lecturas (`if (isnan(temperatura) || isnan(humedad))`) y publica con `client.publish(topic, payload.c_str())`.
+  2. `reconnect()`: bucle `while (!client.connected())` con `client.connect(mqtt_client_name)` (usando un `clientId` único para no colisionar en el broker público) y espera de `5000 ms` entre reintentos.
+  3. `setup()`: `Serial.begin(115200);`, inicialización de sensores (`dht.begin()`), `setup_wifi()`, `client.setServer(mqtt_server, mqtt_port)` y `client.setCallback(...)` para comandos entrantes.
+  4. `loop()`: asegura conexión (`if (!client.connected()) reconnect(); client.loop();`), valida lecturas (`if (isnan(temperatura) || isnan(humedad))`) y publica **valores simples en texto plano por tópico separado** usando `client.publish(topico, String(valor).c_str())` con temporizador no bloqueante (`millis()`).
 
 ### 2.3. Patrón HTTP M2M y Micro-Servidor Local (`Semana 8.pdf` y `NodeMCU + Android.pdf`)
 * **Cliente HTTP M2M hacia Backend (POST JSON):**
@@ -138,7 +160,7 @@ Al crear el proyecto en Android Studio (`New Project`), respetar exactamente est
 
 ### 3.2. Los 6 Entregables Obligatorios del Examen Final (Semana 16)
 1. **Prototipo de Software (MVP)** operativo en demostración en vivo.
-2. **Script de cada requerimiento** (`backend/app/routers/field.py`, `home_tower.py`, `vertical_farm.py`).
+2. **Script de cada requerimiento** (`backend/app/routers/field_service.py`, `home_tower_service.py`, `vertical_farm_service.py`).
 3. **Script del microcontrolador** (`firmware/`).
 4. **Script de la base de datos** (`backend/app/database_schema.sql`).
 5. **Plan de pruebas de integración** (`CP-01` a `CP-06`).

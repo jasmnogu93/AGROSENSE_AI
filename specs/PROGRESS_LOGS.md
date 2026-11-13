@@ -1,7 +1,7 @@
 # PROGRESS_LOGS.md — Historial de Progreso y Trazabilidad SDD (AgroSense AI)
 
 > **Documento:** `specs/PROGRESS_LOGS.md`  
-> **Última Actualización:** 2026-11-11 20:05:00 (Chile / Temuco)  
+> **Última Actualización:** 2026-11-13 10:51:00 (Chile / Temuco)  
 > **Metodología:** Spec-Driven Development (SDD)  
 > **Líder de Registro:** `spec_lead` & `academic_compliance`
 
@@ -17,8 +17,8 @@
 | **VerticalFarm Service (Industrial)**| `specs/spec-004-vertical-farm-service.md` | `COMPLETADO` | Visión industrial multi-celda y analítica |
 | **Frontend Adaptativo Hub** | `specs/spec-005-frontend-adaptive-hub.md` | `COMPLETADO` | UI adaptativa de 3 pestañas sincronizada en OneDrive, Desktop y GitHub |
 | **IA JEV, Chat y Simulación** | `specs/spec-006-ai-and-simulation.md` | `COMPLETADO` | Reglas deterministas, fallback LLM y 4 escenarios de simulación |
-| **Firmware ESP32 DevKit V1** | `specs/spec-007-esp32-firmware.md` | `ESPECIFICADO` | Spec lista con pinout oficial y MQTT; listo para implementar en `firmware/` |
-| **App Móvil Android (IEI-058)** | `specs/spec-008-android-app.md` | `ESPECIFICADO` | Spec lista (Java / `Empty Views Activity` / `HttpURLConnection`); listo para `Programacion Android/` |
+| **Firmware ESP32 DevKit V1** | `specs/spec-007-esp32-firmware.md` | `COMPLETADO` | Firmware C++ ESP32 DevKit V1 implementado en `firmware/` con PubSubClient, DHT11 (GPIO 4), pulso anti-electrólisis 50 ms (GPIO 25/34), relé bomba (GPIO 26), servo (GPIO 18), PaP (19, 23, 5, 13), broker `broker.emqx.io:1883`, tópicos `ASAI/*` 1:1 con Android y fail-safe anti-cavitación < 20% |
+| **App Móvil Android (IEI-058)** | `specs/spec-008-android-app.md` | `COMPLETADO` | App `ASAIapp/` exclusiva `HomeTowerService` compilada (`app-debug.apk`) con Java + Paho MQTT + `LocalBroadcastManager` + `CardView` |
 | **Estándares Académicos y Herramientas** | `specs/spec-009-academic-standards-and-tools.md` | `COMPLETADO` | Compendio compacto IEI-058, IEI-059 (Wokwi/Arduino/MQTTX) e IEI-094 (`CP-01..06`) |
 
 ---
@@ -41,8 +41,8 @@
 - [x] **Recirculación Continua por Ciclo:** Parámetros de frecuencia (horas) y duración (minutos) de bombeo periódico. `[COMPLETADO]`
 - [x] **Control Manual de Actuadores:** Endpoints para accionar Bomba 5V (GPIO 26), Servomotor SG90 (GPIO 18) y PaP 28BYJ-48. `[COMPLETADO]`
 - [x] **Cálculo Fisiológico de DPV:** Fórmula de Tetens para Déficit de Presión de Vapor en tiempo real. `[COMPLETADO]`
-- [ ] **Desarrollo de App Android Nativa (`spec-008`):** Pantallas de conexión, control bomba/servo, notificaciones y GPS según pautas IEI-058. `[PENDIENTE]`
-- [ ] **Desarrollo de Firmware C++ ESP32 (`spec-007`):** Implementar `.ino` en `firmware/` con `<PubSubClient.h>`, `<DHT.h>`, pulso 50 ms GPIO 25/34 y pinout PaP `19, 23, 5, 13`. `[PENDIENTE]`
+- [x] **Desarrollo de App Android Nativa (`spec-008`):** Implementada `ASAIapp/` exclusiva para `HomeTowerService` en Java con tarjetas `CardView`, Paho `MqttAsyncClient` + `LocalBroadcastManager` (`broker.emqx.io:1883`) y control de bomba/servo/nutrientes con bloqueo `<20%` (`Android + mqtt.pdf`). `[COMPLETADO]`
+- [x] **Desarrollo de Firmware C++ ESP32 (`spec-007`):** Implementado `.ino` en `firmware/esp32_asai_mqtt/esp32_asai_mqtt.ino` con `<PubSubClient.h>`, `<DHT.h>`, `<ESP32Servo.h>`, `<Stepper.h>`, tópicos texto plano `ASAI/*` en `broker.emqx.io:1883` (compatibles 1:1 con `ASAIapp` y MQTTX), pulso 50 ms GPIO 25/34, relé GPIO 26 con corte anti-cavitación `< 20%` y pinout PaP `19, 23, 5, 13` sin GPIO 12. Diagrama Wokwi y guía para Miguel generados. `[COMPLETADO]`
 - [x] **Deuda Técnica Backend/Repo:** Sincronizado `main.py` + `index.html`, corregida etiqueta `19, 23, 5, 13`, eliminada BD fantasma y unificada persistencia SQLite en `backend/app/db.py` + `config.py`. `[COMPLETADO]`
 
 ### C. Servicio de Invernaderos Verticales Industriales (`VerticalFarmService` — Comercial)
@@ -68,3 +68,7 @@
 | `2026-11-11 19:43` | `spec_lead` | Creación de `GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md` con método de 6 preguntas, botiquín de diagnóstico código→SDD y glosario sin jerga. | Sincronizado y enlazado desde `ProyectoServiciosASAI/README_PROYECTO_SERVICIOS_ASAI.md`. |
 | `2026-11-11 20:04` | `qa_verification` / `architect` | Consolidación en carpeta única limpia `C:\Users\Jonathan\Desktop\AGROSENSE_AI` (fuera de OneDrive), actualización de `.gitignore`, `requirements.txt` (`pytest`, `python-dotenv`) y creación de `backend/tests/test_api.py`. | `pytest -v`: **7 passed** en `1.22s` con BD temporal aislada. |
 | `2026-11-12 21:50` | `spec_lead` / `academic_compliance` | Creación de `spec-009-academic-standards-and-tools.md` (compendio IEI-058 Java, IEI-059 Wokwi/Arduino/MQTTX e IEI-094 `CP-01..06`), actualización de `spec-008` a Java, actualización de `AGENTS.md` (Orchestrator Argon + Hydrogen + Flash) y limpieza de PDFs/documentos legado en `AGROSENSE_AI`. | Repositorio depurado con proyecto vigente y `pytest -v` validado. |
+| `2026-11-13 00:10` | `spec_lead` / `android_engineer` | Alineación de `spec-007`, `spec-008`, `spec-009`, `AGENTS.md` y `GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md` al estándar `Android + mqtt.pdf` (Java, `CardView`, Eclipse Paho `MqttAsyncClient`, `LocalBroadcastManager`, `broker.emqx.io:1883`, tópicos `ASAI/*` compatibles con MQTTX) y nueva ruta `ASAIapp/`. | Especificaciones y documentación SDD actualizadas; PDF temporal retirado del repo y `pytest` validado. |
+| `2026-11-13 00:26` | `android_engineer` / `qa_verification` | Implementación de `ASAIapp/` exclusiva para `HomeTowerService` (`libs.versions.toml`, `app/build.gradle.kts`, `gradle.properties`, `AndroidManifest.xml`, `colors.xml`, 4 íconos vectoriales, `activity_main.xml` con `CardView` + controles manuales, y `MainActivity.java` con `MqttAsyncClient` + `LocalBroadcastManager`). | `.\gradlew.bat assembleDebug --no-daemon`: `BUILD SUCCESSFUL in 1m 24s` (`33 actionable tasks: 33 executed`, `app-debug.apk` generado). |
+| `2026-11-13 10:38` | `iot_firmware_engineer` / `qa_verification` | Implementación y verificación de suite de firmware ESP32 DevKit V1 en `firmware/` (`esp32_asai_mqtt.ino`, `libraries.txt`, `diagram.json`, `GUIA_RAPIDA_MIGUEL_ESP32.md`). | Verificación 100% exitosa: pinout exacto (DHT11 GPIO 4, VCC/ADC nivel GPIO 25/34 pulso 50 ms, relé GPIO 26, servo GPIO 18, PaP GPIO 19, 23, 5, 13 sin GPIO 12), broker `broker.emqx.io:1883`, sincronización de tópicos 1:1 con `ASAIapp` y MQTTX, fail-safe anti-cavitación `< 20%` y guía para Miguel. |
+| `2026-11-13 10:51` | `spec_lead` / `qa_verification` | Publicación en GitHub (`origin/main`, `origin/MiguelRama`, `origin/JonathanRama`) del paquete completo `ASAIapp/`, `firmware/` y especificaciones SDD actualizadas. | Repositorio sincronizado en GitHub para pruebas de hardware ESP32 + Android por Miguel. |

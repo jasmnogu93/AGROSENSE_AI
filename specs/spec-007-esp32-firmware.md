@@ -37,34 +37,29 @@ Implementar el firmware C++ (Arduino IDE / PlatformIO) para el microcontrolador 
 * `<ESP32Servo.h>` y `<Stepper.h>` (o secuencia de medio paso para ULN2003)
 * **Monitor Serial:** `115200 baud` (evidencia obligatoria Semana 14).
 
-### 3.2. Tópicos y Payloads MQTT (Broker HiveMQ / Mosquitto)
-* **Publicación de Telemetría (cada `10 segundos`):** `agrosense/telemetria/celda01`
-  ```json
-  {
-    "modulo": "celda-01",
-    "temp_ambiente": 22.4,
-    "humedad_ambiente": 60.5,
-    "presion_hpa": 1014.2,
-    "dpv_kpa": 1.05,
-    "nivel_estanque": 82.0,
-    "bomba_activa": false,
-    "servo_angulo": 0
-  }
-  ```
-* **Suscripción de Comandos:** `agrosense/comandos/celda01`
-  ```json
-  { "actuador": "bomba_agua", "accion": "ON", "parametro": 60, "origen": "android_app" }
-  { "actuador": "servo_ventilacion", "accion": "SET_ANGLE", "parametro": 90, "origen": "jev_rules_engine" }
-  { "actuador": "motor_nutrientes", "accion": "DISPENSE_STEPS", "parametro": 512, "origen": "manual_dashboard" }
-  ```
-* **Publicación de Alertas Críticas:** `agrosense/alertas/celda01`
+### 3.2. Tópicos y Payloads MQTT (`broker.emqx.io:1883` — Estándar `Android + mqtt.pdf` y MQTTX)
+Para mantener compatibilidad 100% directa con **MQTTX** y con la app **`ASAIapp`** (sin requerir parseo JSON en Java, siguiendo la pág. 15 de `Android + mqtt.pdf`), el ESP32 se conecta a **`broker.emqx.io`** (puerto **`1883`**, `QoS 0`, `Plaintext`, ID único `"ESP32_ASAI_01"`) usando un temporizador no bloqueante (`millis()`) para no congelar `client.loop()`.
 
-### 3.3. Respaldo HTTP REST y Servidor Local (Pauta Android IEI-058)
-* **HTTP POST hacia FastAPI:** Permite enviar lecturas a `/api/v1/telemetry` (y/o `/api/v1/services/field/telemetry`) en formato `TelemetryInput` (`air_temperature`, `air_humidity`, `barometric_pressure_hpa`, `reservoir_level_percent`, `pump_active`, `vent_servo_angle`).
-* **Micro-servidor HTTP local en ESP32 (puerto 80):** Exponer `/encender` y `/apagar` para demostración directa desde Android en red local según guía `NodeMCU + Android.pdf`.
+* **Publicación de Métricas en Tiempo Real (texto plano vía `client.publish(topico, String(valor).c_str())`):**
+  * `ASAI/Temperatura` -> ej. `"22.40"` (°C)
+  * `ASAI/Humedad` -> ej. `"60.50"` (%)
+  * `ASAI/Nivel` -> ej. `"82.00"` (%)
+  * `ASAI/DPV` -> ej. `"1.05"` (kPa calculado con fórmula Tetens)
+  * `ASAI/Presion` -> ej. `"1014.20"` (hPa BME280)
+  * `ASAI/Bomba` -> `"ON"` o `"OFF"`
+  * `ASAI/Alerta` -> `"NORMAL"` o `"ESTANQUE_BAJO"`
+
+* **Suscripción de Comandos desde `ASAIapp` / MQTTX (`client.subscribe(...)`):**
+  * `ASAI/Bomba/cmd` -> acepta `"ON"` / `"OFF"` (activa/desactiva Relé `GPIO 26`, sujeto al bloqueo `< 20%`).
+  * `ASAI/Servo/cmd` -> acepta ángulo en texto `"0"`, `"45"`, `"90"` (mueve Servo SG90 `GPIO 18`).
+  * `ASAI/Nutrientes/cmd` -> acepta cantidad de pasos en texto, ej. `"100"` / `"512"` (acciona PaP `GPIO 19, 23, 5, 13`).
+
+### 3.3. Sincronización con Backend FastAPI (Web + SQLite)
+* **HTTP POST hacia FastAPI:** En paralelo a MQTT, el ESP32 (o un puente MQTT→HTTP en backend) envía lecturas JSON a `/api/v1/telemetry` en formato `TelemetryInput` (`air_temperature`, `air_humidity`, `barometric_pressure_hpa`, `reservoir_level_percent`, `pump_active`, `vent_servo_angle`) para que el **Dashboard Web** y **`agrosense.db`** muestren exactamente las mismas métricas que `ASAIapp`.
+* **Micro-servidor HTTP local en ESP32 (puerto 80, opcional de respaldo):** `/encender` y `/apagar` para pruebas locales de contingencia.
 
 ---
 
 ## 4. Lógica Embebida de Seguridad (*Fail-Safe* Local)
 1. Antes de encender o mantener encendido el Relé (`GPIO 26`), el loop verifica el nivel calibrado en `GPIO 34`.
-2. **Given** que el nivel cae bajo **20%** (`reservoir_level_percent < 20.0`), **When** llega un comando `ON` por MQTT o HTTP (o la bomba ya estaba encendida), **Then** el ESP32 **corta el relé inmediatamente** en hardware, bloquea la activación y publica alerta en `agrosense/alertas/celda01`.
+2. **Given** que el nivel cae bajo **20%** (`reservoir_level_percent < 20.0`), **When** llega un comando `ON` por MQTT o HTTP (o la bomba ya estaba encendida), **Then** el ESP32 **corta el relé inmediatamente** en hardware, bloquea la activación y publica `"ESTANQUE_BAJO"` en `ASAI/Alerta` (y `"OFF"` en `ASAI/Bomba`).

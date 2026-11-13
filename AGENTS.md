@@ -78,11 +78,11 @@ graph TD
   * Lógica local de fail-safe: apagado automático de bomba si el nivel cae de 20%.
 
 ### 2.7. `android_engineer` — Android Native Developer
-* **Misión:** Guiar la arquitectura y consumo de servicios desde la aplicación móvil Android.
+* **Misión:** Guiar la arquitectura, diseño minimalista y comunicación MQTT de la aplicación móvil nativa `ASAIapp`.
 * **Responsabilidades:**
-  * Diseñar las pantallas de monitoreo de la mini torre domiciliaria.
-  * Gestionar la conexión Wi-Fi/Bluetooth y sincronización periódica de telemetría.
-  * Disparar comandos manuales a los actuadores (bomba, ventilación, dosificación).
+  * Construir `ASAIapp/` en Java (`Empty Views Activity`, `CardView`, `findViewById`, `Intent`) usando exclusivamente widgets y patrones enseñados en clase (`spec-009`).
+  * Implementar la suscripción/publicación en tiempo real contra `tcp://broker.emqx.io:1883` mediante Eclipse Paho (`MqttAsyncClient`), `LocalBroadcastManager` y `BroadcastReceiver` (`Android + mqtt.pdf`).
+  * Mostrar las mismas métricas en vivo que la web y disparar comandos seguros a los actuadores (`ASAI/Bomba/cmd`, `ASAI/Servo/cmd`, `ASAI/Nutrientes/cmd`).
 
 ### 2.8. `qa_verification` — Quality Assurance & Verification Specialist
 * **Misión:** Validar que los entregables funcionen end-to-end antes de dar por cerrada una tarea.
@@ -148,7 +148,7 @@ AGROSENSE_AI/
 │   ├── tests/
 │   │   └── test_api.py                     <- Suite automatizada pytest (con BD temporal aislada)
 │   └── agrosense.db                        <- Base de datos SQLite persistente (local, ignorada en Git)
-├── Programacion Android/                   <- Aplicación nativa Android (IEI-058)
+├── ASAIapp/                                  <- Aplicación nativa Android en Java + MQTT (IEI-058)
 └── firmware/                               <- Código C++ para ESP32 DevKit V1 (IEI-059)
 ```
 
@@ -157,9 +157,10 @@ AGROSENSE_AI/
 ## 5. Política de Orquestación, Modelos y Esfuerzos (Orchestrator Argon + Hydrogen + Flash)
 
 ### 5.1. Modo de Orquestación Elegido: Enjambre Nativo (`swarm`) + Subagentes Tácticos
-* **Modo Principal (`swarm`):** Es el mecanismo oficial para sprints multi-disciplina y trabajo paralelo (ej. desarrollar **Firmware ESP32** + **App Android** + **Backend MQTT** simultáneamente).
-  * **Justificación técnica:** Es el único modo que permite asignar el ID exacto de modelo y nivel de esfuerzo (`high`, `medium`, `low`, `xhigh`), aislar carpetas de autores mediante `workspace: "share"` sin conflictos de edición, y mantener un rol verificador (`qa_verification`) auditando en paralelo mediante tablero compartido.
-* **Modo Secundario (`invoke_subagent`):** Se usa únicamente para tareas unitarias, aisladas y de un solo hilo (ej. extraer texto de una pauta PDF o consultar un archivo puntual con `flash` / `pro`), evitando el sobrecosto de tokens de abrir un enjambre cuando no existe paralelismo.
+* **Modo Principal (`swarm`) — Delegación Obligatoria para Proteger Argon:** Es el mecanismo oficial tanto para **sprints multi-disciplina en paralelo** como para **tareas de desarrollo de un solo dominio o carpeta** (ej. editar únicamente `ASAIapp/`, únicamente `firmware/` o únicamente `backend/`).
+  * **Prohibición expresa de programar directo en el hilo de Argon:** Cuando el Coordinador opera en `Orchestrator (Argon)` (cuota semanal limitada), **solo conversa, planifica SDD y revisa resultados**; queda prohibido escribir código de implementación o ejecutar compilaciones pesadas directamente en el hilo de Argon. Toda implementación y verificación debe delegarse vía `swarm{action:"add"}` asignando explícitamente el parámetro `model` de **`Gemini 4 Hydrogen`** o **`Gemini 3.8 Flash`** (bolsa diaria).
+  * **Justificación técnica:** `swarm` permite asignar el ID exacto de modelo y nivel de esfuerzo (`high`, `medium`, `low`, `xhigh`), aislar carpetas de autores mediante `workspace: "share"` sin conflictos de edición, y mantener un rol verificador (`qa_verification`) auditando mediante tablero compartido.
+* **Modo Secundario (`invoke_subagent`):** Se usa únicamente para lecturas puntuales aisladas sin edición (ej. extraer texto de un PDF o inspeccionar un archivo con `flash`), sin gastar cuota de Argon.
 
 ### 5.2. Autorización Explícita y Matriz de Modelos / Esfuerzos
 Por instrucción expresa del propietario del proyecto (cuenta **Gemini Pro**), el Coordinador está autorizado a asignar un modelo y nivel de esfuerzo específico al crear o reasignar workers (`swarm add` / `swarm model`), siguiendo esta matriz:
@@ -169,16 +170,16 @@ Por instrucción expresa del propietario del proyecto (cuenta **Gemini Pro**), e
 | `Coordinador Principal` | Orquestación general, planificación SDD y revisión de arquitectura en chat | `Orchestrator (Argon)` (`gemini-pro-orchestrator-g1-pro` / `gemini-4-argon-high`) | Alto (aprovecha cuota semanal independiente) |
 | `architect` / `spec_lead` | Diseño SOA, contratos Pydantic/SQL, specs SDD críticas | `gemini-4-hydrogen-high` *(subir a `gemini-4-hydrogen-xhigh` en decisiones críticas)* | Alto–Muy Alto |
 | `iot_firmware_engineer` | Firmware C++ ESP32 / Wokwi, pulso 50 ms GPIO 25/34, MQTT y fail-safe | `gemini-4-hydrogen-high` *(subir a `gemini-4-hydrogen-xhigh` en seguridad física crítica)* | Alto |
-| `android_engineer` | App Android en Java (`Empty Views Activity`, `HttpURLConnection`, `Thread`), Wi-Fi y notificaciones | `gemini-4-hydrogen-medium` *(subir a `gemini-4-hydrogen-high` en red/servicios)* | Medio–Alto |
+| `android_engineer` | App Android en Java (`Empty Views Activity`, Paho `MqttAsyncClient`, `LocalBroadcastManager`, `CardView`), `broker.emqx.io` y Google Maps | `gemini-4-hydrogen-medium` *(subir a `gemini-4-hydrogen-high` en red/servicios)* | Medio–Alto |
 | `backend_service_dev` | Endpoints FastAPI, routers de los 3 servicios, consultas SQLite | `gemini-3.8-flash-high` *(subir a `gemini-4-hydrogen-medium` en refactors complejos)* | Medio–Alto (rápido sobre patrón ya definido) |
 | `frontend_ui_engineer` | UI adaptativa en `index.html`, Tailwind CSS y Fetch JS | `gemini-3.8-flash-medium` | Medio (iteración visual ágil) |
 | `academic_compliance` | Auditoría contra pautas IEI-094, IEI-059, IEI-058 (`spec-009`) y Feria | `gemini-3.8-flash-medium` | Medio |
 | `qa_verification` | Pruebas HTTP/`pytest`, simulación de fallos y bitácora `PROGRESS_LOGS.md` | `gemini-3.8-flash-low` *(subir a `gemini-3.8-flash-medium` en pruebas E2E)* | Bajo–Medio (verificación mecánica) |
 
-> **Regla de Cuota y Respaldo (Doble Bolsa):** El Coordinador opera en **Orchestrator (Argon)** consumiendo la bolsa de cuota semanal, mientras los workers principales operan en **Gemini 4 Hydrogen** y **Gemini 3.8 Flash** consumiendo la bolsa de cuota diaria. Si algún worker en `Hydrogen` agota su cuota diaria durante un sprint intenso, el Coordinador usará `swarm{action:"model"}` para reasignarlo a `gemini-4-argon-high` o `gemini-4-argon-medium` (respaldo semanal) documentando el motivo en el tablero, sin destruir el historial del worker.
+> **Regla de Cuota y Respaldo (Protección de Argon / Doble Bolsa):** El Coordinador opera en **Orchestrator (Argon)** consumiendo la **bolsa de cuota semanal (más limitada)**, por lo que **antes de iniciar cualquier implementación debe delegar mediante `swarm{action:"add"}`** al rol correspondiente de la tabla (`iot_firmware_engineer`, `android_engineer`, `backend_service_dev`, `frontend_ui_engineer`, `qa_verification`) fijando explícitamente `model` en **`gemini-4-hydrogen-*`** o **`gemini-3.8-flash-*`** (bolsa diaria). Solo si algún worker en `Hydrogen` agota su cuota diaria durante un sprint crítico, el Coordinador podrá usar `swarm{action:"model"}` para reasignarlo temporalmente a `gemini-4-argon-high` o `gemini-4-argon-medium` documentando el motivo en el tablero, sin destruir el historial del worker.
 
 ### 5.3. Reglas de Concurrencia y Propiedad de Archivos
-1. **Un dueño por carpeta/archivo:** Ningún autor comparte ruta editable con otro en el mismo turno (`firmware/` -> `iot_firmware_engineer`, `Programacion Android/` -> `android_engineer`, `backend/app/routers/` -> `backend_service_dev`, `backend/app/templates/` -> `frontend_ui_engineer`).
+1. **Un dueño por carpeta/archivo:** Ningún autor comparte ruta editable con otro en el mismo turno (`firmware/` -> `iot_firmware_engineer`, `ASAIapp/` -> `android_engineer`, `backend/app/routers/` -> `backend_service_dev`, `backend/app/templates/` -> `frontend_ui_engineer`).
 2. **Aislamiento de escritura (`workspace: "share"`):** Todo worker que edite o compile código en paralelo se lanza con `workspace: "share"`. Al terminar y ser verificado, sus cambios se integran limpiamente en la rama/directorio principal antes de cerrar el worker (`kill`).
 3. **Verificadores en solo lectura (`workspace: "inherit"`):** `qa_verification` y `academic_compliance` trabajan sobre `inherit`, ejecutan pruebas o inspecciones y reportan hallazgos por número de mensaje (`#seq`) al Coordinador o al autor correspondiente; nunca corrigen código directamente sobre archivos ajenos.
 4. **Cierre de ciclo SDD:** Ninguna iteración del enjambre se da por cerrada hasta que `qa_verification` valide la ejecución y el Coordinador registre el resultado en `specs/PROGRESS_LOGS.md`.
