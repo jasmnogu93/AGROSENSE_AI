@@ -22,7 +22,7 @@ graph TD
     Architect --> BackendDev["⚡ Backend Service Engineer (FastAPI)"]
     Architect --> FrontendDev["🎨 Frontend UI/UX Engineer"]
     Architect --> IoTEngineer["🔌 Embedded & Hardware Engineer (ESP32)"]
-    Architect --> AndroidDev["📱 Android Native Engineer (Kotlin)"]
+    Architect --> AndroidDev["📱 Android Native Engineer (Java)"]
     
     BackendDev --> QA["🧪 QA & Verification Specialist"]
     FrontendDev --> QA
@@ -134,6 +134,7 @@ AGROSENSE_AI/
 │   ├── spec-006-ai-and-simulation.md       <- Motor JEV, Chat Agronómico y Simulaciones
 │   ├── spec-007-esp32-firmware.md          <- Firmware C++ ESP32 DevKit V1, MQTT y Fail-Safe
 │   ├── spec-008-android-app.md             <- Aplicación Nativa Android (IEI-058)
+│   ├── spec-009-academic-standards-and-tools.md <- Estándares docentes IEI-058/059/094 y plantillas de clase
 │   └── PROGRESS_LOGS.md                    <- Registro de Trazabilidad y Estado de Avance
 ├── ProyectoServiciosASAI/                  <- Documentación Formal Académica y de Arquitectura
 ├── backend/                                <- Servidor FastAPI Modular
@@ -153,11 +154,11 @@ AGROSENSE_AI/
 
 ---
 
-## 5. Política de Orquestación, Modelos y Esfuerzos (Gemini Pro / Argon)
+## 5. Política de Orquestación, Modelos y Esfuerzos (Orchestrator Argon + Hydrogen + Flash)
 
 ### 5.1. Modo de Orquestación Elegido: Enjambre Nativo (`swarm`) + Subagentes Tácticos
 * **Modo Principal (`swarm`):** Es el mecanismo oficial para sprints multi-disciplina y trabajo paralelo (ej. desarrollar **Firmware ESP32** + **App Android** + **Backend MQTT** simultáneamente).
-  * **Justificación técnica:** Es el único modo que permite asignar el ID exacto de modelo y nivel de esfuerzo (`high`, `medium`, `low`), aislar carpetas de autores mediante `workspace: "share"` sin conflictos de edición, y mantener un rol verificador (`qa_verification`) auditando en paralelo mediante tablero compartido.
+  * **Justificación técnica:** Es el único modo que permite asignar el ID exacto de modelo y nivel de esfuerzo (`high`, `medium`, `low`, `xhigh`), aislar carpetas de autores mediante `workspace: "share"` sin conflictos de edición, y mantener un rol verificador (`qa_verification`) auditando en paralelo mediante tablero compartido.
 * **Modo Secundario (`invoke_subagent`):** Se usa únicamente para tareas unitarias, aisladas y de un solo hilo (ej. extraer texto de una pauta PDF o consultar un archivo puntual con `flash` / `pro`), evitando el sobrecosto de tokens de abrir un enjambre cuando no existe paralelismo.
 
 ### 5.2. Autorización Explícita y Matriz de Modelos / Esfuerzos
@@ -165,15 +166,16 @@ Por instrucción expresa del propietario del proyecto (cuenta **Gemini Pro**), e
 
 | Rol / Sub-agente | Alcance y Dominio | Modelo y Esfuerzo Asignado | Nivel de Razonamiento |
 | :--- | :--- | :--- | :--- |
-| `architect` / `spec_lead` | Diseño SOA, contratos Pydantic/SQL, specs SDD críticas | `gemini-4-argon-high` | Alto (sin margen de error estructural) |
-| `iot_firmware_engineer` | Firmware C++ ESP32, pulso 50 ms GPIO 25/34, MQTT y fail-safe | `gemini-4-argon-high` | Alto (seguridad física y hardware) |
-| `android_engineer` | App Android (Kotlin/Java), Retrofit, BLE/Wi-Fi y notificaciones | `gemini-4-argon-medium` *(subir a `gemini-4-argon-high` en arquitectura de red/servicios)* | Medio–Alto |
-| `backend_service_dev` | Endpoints FastAPI, routers de los 3 servicios, consultas SQLite | `gemini-3.8-flash-high` *(subir a `gemini-4-argon-medium` en refactors complejos)* | Medio–Alto (rápido sobre patrón ya definido) |
+| `Coordinador Principal` | Orquestación general, planificación SDD y revisión de arquitectura en chat | `Orchestrator (Argon)` (`gemini-pro-orchestrator-g1-pro` / `gemini-4-argon-high`) | Alto (aprovecha cuota semanal independiente) |
+| `architect` / `spec_lead` | Diseño SOA, contratos Pydantic/SQL, specs SDD críticas | `gemini-4-hydrogen-high` *(subir a `gemini-4-hydrogen-xhigh` en decisiones críticas)* | Alto–Muy Alto |
+| `iot_firmware_engineer` | Firmware C++ ESP32 / Wokwi, pulso 50 ms GPIO 25/34, MQTT y fail-safe | `gemini-4-hydrogen-high` *(subir a `gemini-4-hydrogen-xhigh` en seguridad física crítica)* | Alto |
+| `android_engineer` | App Android en Java (`Empty Views Activity`, `HttpURLConnection`, `Thread`), Wi-Fi y notificaciones | `gemini-4-hydrogen-medium` *(subir a `gemini-4-hydrogen-high` en red/servicios)* | Medio–Alto |
+| `backend_service_dev` | Endpoints FastAPI, routers de los 3 servicios, consultas SQLite | `gemini-3.8-flash-high` *(subir a `gemini-4-hydrogen-medium` en refactors complejos)* | Medio–Alto (rápido sobre patrón ya definido) |
 | `frontend_ui_engineer` | UI adaptativa en `index.html`, Tailwind CSS y Fetch JS | `gemini-3.8-flash-medium` | Medio (iteración visual ágil) |
-| `academic_compliance` | Auditoría contra pautas IEI-094, IEI-059, IEI-058 y Feria | `gemini-3.8-flash-medium` | Medio |
-| `qa_verification` | Pruebas HTTP, simulación de fallos y bitácora `PROGRESS_LOGS.md` | `gemini-3.8-flash-low` *(subir a `gemini-3.8-flash-medium` en pruebas E2E)* | Bajo–Medio (verificación mecánica) |
+| `academic_compliance` | Auditoría contra pautas IEI-094, IEI-059, IEI-058 (`spec-009`) y Feria | `gemini-3.8-flash-medium` | Medio |
+| `qa_verification` | Pruebas HTTP/`pytest`, simulación de fallos y bitácora `PROGRESS_LOGS.md` | `gemini-3.8-flash-low` *(subir a `gemini-3.8-flash-medium` en pruebas E2E)* | Bajo–Medio (verificación mecánica) |
 
-> **Regla de Cuota y Respaldo:** Los modelos `gemini-4-argon-*` tienen cuota semanal y se reservan para decisiones de arquitectura, hardware embebido crítico y lógica móvil compleja. Si algún worker agota cuota o capacidad, el Coordinador usará `swarm{action:"model"}` documentando el motivo en el tablero, sin destruir el historial del worker.
+> **Regla de Cuota y Respaldo (Doble Bolsa):** El Coordinador opera en **Orchestrator (Argon)** consumiendo la bolsa de cuota semanal, mientras los workers principales operan en **Gemini 4 Hydrogen** y **Gemini 3.8 Flash** consumiendo la bolsa de cuota diaria. Si algún worker en `Hydrogen` agota su cuota diaria durante un sprint intenso, el Coordinador usará `swarm{action:"model"}` para reasignarlo a `gemini-4-argon-high` o `gemini-4-argon-medium` (respaldo semanal) documentando el motivo en el tablero, sin destruir el historial del worker.
 
 ### 5.3. Reglas de Concurrencia y Propiedad de Archivos
 1. **Un dueño por carpeta/archivo:** Ningún autor comparte ruta editable con otro en el mismo turno (`firmware/` -> `iot_firmware_engineer`, `Programacion Android/` -> `android_engineer`, `backend/app/routers/` -> `backend_service_dev`, `backend/app/templates/` -> `frontend_ui_engineer`).

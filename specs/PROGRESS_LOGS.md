@@ -18,7 +18,8 @@
 | **Frontend Adaptativo Hub** | `specs/spec-005-frontend-adaptive-hub.md` | `COMPLETADO` | UI adaptativa de 3 pestañas sincronizada en OneDrive, Desktop y GitHub |
 | **IA JEV, Chat y Simulación** | `specs/spec-006-ai-and-simulation.md` | `COMPLETADO` | Reglas deterministas, fallback LLM y 4 escenarios de simulación |
 | **Firmware ESP32 DevKit V1** | `specs/spec-007-esp32-firmware.md` | `ESPECIFICADO` | Spec lista con pinout oficial y MQTT; listo para implementar en `firmware/` |
-| **App Móvil Android (IEI-058)** | `specs/spec-008-android-app.md` | `ESPECIFICADO` | Spec lista; listo para implementar en `Programacion Android/` |
+| **App Móvil Android (IEI-058)** | `specs/spec-008-android-app.md` | `ESPECIFICADO` | Spec lista (Java / `Empty Views Activity` / `HttpURLConnection`); listo para `Programacion Android/` |
+| **Estándares Académicos y Herramientas** | `specs/spec-009-academic-standards-and-tools.md` | `COMPLETADO` | Compendio compacto IEI-058, IEI-059 (Wokwi/Arduino/MQTTX) e IEI-094 (`CP-01..06`) |
 
 ---
 
@@ -66,3 +67,4 @@
 | `2026-11-11 19:32` | `backend_service_dev` / `qa_verification` | Creación de `backend/app/db.py`, tablas `calendario_semanal` y `estado_modulo` en SQLite, sincronización `main.py` + `index.html`, corrección etiqueta PaP `19,23,5,13` y limpieza de deuda técnica. | `ALL_BACKEND_CHECKS_PASSED` vía FastAPI `TestClient` (persistencia, bloqueo `<20%` anti-cavitación y los 3 servicios). |
 | `2026-11-11 19:43` | `spec_lead` | Creación de `GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md` con método de 6 preguntas, botiquín de diagnóstico código→SDD y glosario sin jerga. | Sincronizado y enlazado desde `ProyectoServiciosASAI/README_PROYECTO_SERVICIOS_ASAI.md`. |
 | `2026-11-11 20:04` | `qa_verification` / `architect` | Consolidación en carpeta única limpia `C:\Users\Jonathan\Desktop\AGROSENSE_AI` (fuera de OneDrive), actualización de `.gitignore`, `requirements.txt` (`pytest`, `python-dotenv`) y creación de `backend/tests/test_api.py`. | `pytest -v`: **7 passed** en `1.22s` con BD temporal aislada. |
+| `2026-11-12 21:50` | `spec_lead` / `academic_compliance` | Creación de `spec-009-academic-standards-and-tools.md` (compendio IEI-058 Java, IEI-059 Wokwi/Arduino/MQTTX e IEI-094 `CP-01..06`), actualización de `spec-008` a Java, actualización de `AGENTS.md` (Orchestrator Argon + Hydrogen + Flash) y limpieza de PDFs/documentos legado en `AGROSENSE_AI`. | Repositorio depurado con proyecto vigente y `pytest -v` validado. |

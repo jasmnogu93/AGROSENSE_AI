@@ -3,13 +3,19 @@
 > **Documento:** `specs/spec-008-android-app.md`  
 > **Estado:** APROBADO PARA IMPLEMENTACIÓN  
 > **Carpeta Destino:** `Programacion Android/AgroSenseMobile/` *(a estructurar en Android Studio)*  
-> **Fuentes Oficiales:** `PLAN_DE_DESARROLLO_Y_ENTREGABLES_ASAI.md`, `ESPECIFICACION_DATOS_Y_SERVICIOS_ASAI.md`  
+> **Fuentes Oficiales:** `PLAN_DE_DESARROLLO_Y_ENTREGABLES_ASAI.md`, `ESPECIFICACION_DATOS_Y_SERVICIOS_ASAI.md`, `specs/spec-009-academic-standards-and-tools.md`  
 > **Autor:** `android_engineer` & `academic_compliance`
 
 ---
 
 ## 1. Objetivo y Alcance
-Construir la aplicación móvil Android nativa (Kotlin o Java en Android Studio) que permita controlar y monitorear la **Mini Torre Domiciliaria (`HomeTowerService`)** desde el teléfono para la **Feria de Innovación Santo Tomás**, cumpliendo al 100% los entregables prácticos de **Programación Android (IEI-058)**.
+Construir la aplicación móvil Android nativa (**Java** en Android Studio con plantilla **Empty Views Activity**, Minimum SDK **API 24** y Gradle **Kotlin DSL**) que permita controlar y monitorear la **Mini Torre Domiciliaria (`HomeTowerService`)** desde el teléfono para la **Feria de Innovación Santo Tomás**, cumpliendo al 100% los entregables prácticos de **Programación Android (IEI-058)**.
+
+### 1.1. Estándar Técnico de Implementación (Regla Docente IEI-058)
+* **Lenguaje:** Exclusivamente **Java** (`MainActivity extends AppCompatActivity`) con `findViewById(...)` para enlazar elementos XML.
+* **Concurrencia:** Hilos secundarios clásicos con `new Thread(new Runnable() { ... }).start()` y actualizaciones visuales con `runOnUiThread(new Runnable() { ... })` *(sin Kotlin ni Coroutines)*.
+* **Red HTTP nativa:** Cliente usando `java.net.URL` + `HttpURLConnection` (`GET`/`POST`, verificación `getResponseCode()`) y retroalimentación mediante `Toast.makeText(...)`.
+* **Permisos y tráfico HTTP local:** `<uses-permission android:name="android.permission.INTERNET" />` en `AndroidManifest.xml` y archivo `res/xml/network_security_config.xml` con `cleartextTrafficPermitted="true"`.
 
 ---
 
