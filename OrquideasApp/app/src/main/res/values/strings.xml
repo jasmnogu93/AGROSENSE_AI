@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">AgroSense - Orquídeas</string>
+    <string name="service_subtitle">Invernadero Tradicional · AgroFieldService (RF1 a RF7)</string>
+
+    <!-- Sección 1 -->
+    <string name="sec1_title">Sección 1: Estado y Alertas (RF4, RF7)</string>
+    <string name="sec1_profile_summary">Especie: Phalaenopsis sp. | Rango 18–24 °C | HR Objetivo 80% (75–85%)</string>
+    <string name="label_temperature">Temperatura Ambiental</string>
+    <string name="label_humidity">Humedad Relativa</string>
+    <string name="label_soil">Humedad Sustrato</string>
+    <string name="label_module_status">Estado Módulo</string>
+    <string name="btn_refresh">Actualizar Estado</string>
+    <string name="no_alerts_message">✅ Sin alertas activas. Condiciones ambientales ideales para orquídeas.</string>
+
+    <!-- Sección 2 -->
+    <string name="sec2_title">Sección 2: Riego Semanal y Notificación (RF1, RF2)</string>
+    <string name="notification_banner_title">🔔 Aviso de Próximo Riego (RF2)</string>
+    <string name="days_selector_label">Días de Riego Semanal Activos (RF1):</string>
+    <string name="hint_irrigation_time">Hora de Riego (HH:mm)</string>
+    <string name="hint_duration_minutes">Duración (minutos, 1–120)</string>
+    <string name="btn_save_schedule">Guardar Calendario</string>
+
+    <!-- Días de la semana requeridos -->
+    <string name="day_lun">Lun</string>
+    <string name="day_mar">Mar</string>
+    <string name="day_mie">Mié</string>
+    <string name="day_jue">Jue</string>
+    <string name="day_vie">Vie</string>
+    <string name="day_sab">Sáb</string>
+    <string name="day_dom">Dom</string>
+
+    <!-- Sección 3 -->
+    <string name="sec3_title">Sección 3: Telemetría e Historial (RF3, RF5, RF6)</string>
+    <string name="sec3_subtitle">Transmisión de Lectura de Sensores (Wi-Fi ESP32):</string>
+    <string name="hint_temp_input">Temperatura (°C, -10 a 60)</string>
+    <string name="hint_humidity_input">Humedad Relativa (%, 0 a 100)</string>
+    <string name="hint_soil_input">Humedad Sustrato (%, Opcional)</string>
+    <string name="btn_send_telemetry">Transmitir Telemetría</string>
+    <string name="history_header">Historial de Lecturas (Últimas 10):</string>
+    <string name="history_empty">No hay registros de telemetría disponibles.</string>
+</resources>

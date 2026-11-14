@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Paleta AgroSense AI - Invernadero de Orquídeas -->
+    <color name="asai_primary">#2E7D32</color>
+    <color name="asai_primary_dark">#1B5E20</color>
+    <color name="asai_primary_container">#E8F5E9</color>
+    <color name="asai_on_primary_container">#1B5E20</color>
+
+    <color name="asai_surface">#F4F6F8</color>
+    <color name="asai_card_bg">#FFFFFF</color>
+    <color name="asai_text_primary">#1C1B1F</color>
+    <color name="asai_text_secondary">#49454F</color>
+    <color name="asai_divider">#E0E0E0</color>
+
+    <!-- Estados Agronómicos -->
+    <color name="asai_optimal">#2E7D32</color>
+    <color name="asai_optimal_bg">#E8F5E9</color>
+    <color name="asai_alert">#C62828</color>
+    <color name="asai_alert_bg">#FFEBEE</color>
+    <color name="asai_warning">#E65100</color>
+    <color name="asai_warning_bg">#FFF3E0</color>
+
+    <!-- Banner Notificación (RF2) -->
+    <color name="asai_banner_bg">#E3F2FD</color>
+    <color name="asai_banner_stroke">#90CAF9</color>
+    <color name="asai_banner_text">#0D47A1</color>
+</resources>
