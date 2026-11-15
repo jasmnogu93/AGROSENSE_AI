@@ -1,7 +1,7 @@
 # PROGRESS_LOGS.md — Historial de Progreso y Trazabilidad SDD (AgroSense AI)
 
 > **Documento:** `specs/PROGRESS_LOGS.md`  
-> **Última Actualización:** 2026-11-13 16:57:00 (Chile / Temuco)  
+> **Última Actualización:** 2026-11-14 21:02:30 (Chile / Temuco)  
 > **Metodología:** Spec-Driven Development (SDD)  
 > **Líder de Registro:** `spec_lead` & `academic_compliance`
 
@@ -74,3 +74,4 @@
 | `2026-11-13 10:51` | `spec_lead` / `qa_verification` | Publicación en GitHub (`origin/main`, `origin/MiguelRama`, `origin/JonathanRama`) del paquete completo `ASAIapp/`, `firmware/` y especificaciones SDD actualizadas. | Repositorio sincronizado en GitHub para pruebas de hardware ESP32 + Android por Miguel. |
 | `2026-11-13 16:53` | `spec_lead` / `architect` | Optimización de `AGENTS.md` v3.0 (comandos exactos `pytest`/`uvicorn`/`gradlew`, contratos intocables, criterio `Plan/Execute` vs `swarm`), sincronización con kit global `MI_KIT_AGENTES_SDD`, actualización de `GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md` (`firmware/` y `ASAIapp/` implementados) y creación de guía didáctica con plantilla y ejemplos. | Documentación operativa y kit SDD verificados y publicados en GitHub. |
 | `2026-11-13 16:57` | `spec_lead` / `qa_verification` | Verificación de colaborador GitHub (`nacomantesmurf` / Marcos Bustos, rol `write`), creación de `GUIA_RAPIDA_MARCOS.md` (foco `AgroFieldService` / Integración II) y publicación de rama `MarcosRama` en GitHub. | Rama `origin/MarcosRama` creada y sincronizada junto a `main`, `MiguelRama` y `JonathanRama`. |
+| `2026-11-14 21:02` | `architect` / `qa_verification` | Corrección de aislamiento en `field_service.py` (`/history` filtrado por `module_id="invernadero-orquideas"` + `spec-002` + test `pytest`), merge de `origin/MarcosRama` (`OrquideasApp/`, PR #1) a `main`, ajuste de `toolchainVersion=25` en `OrquideasApp/gradle/gradle-daemon-jvm.properties`, actualización de `AGENTS.md` y creación de `INTEGRACION_EQUIPO_Y_ARQUITECTURA.md`. | `pytest` (`7 passed in 1.01s`) y `OrquideasApp assembleDebug` (`BUILD SUCCESSFUL in 50s`, 33/33 tareas). |

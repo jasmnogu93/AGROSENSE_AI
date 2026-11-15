@@ -8,7 +8,7 @@
 
 ## 1. Propósito y Límites Tri-Servicio (SOA)
 El proyecto sigue una Arquitectura Orientada a Servicios (SOA) en un monolito modular con **3 servicios aislados** (nunca mezclar sus reglas):
-1. **`AgroFieldService` (`backend/app/routers/field_service.py`):** Campos e Invernaderos Tradicionales — Caso Orquídeas (**Integración II `IEI-094`**, RF1–RF7, 80% HR, 18–24 °C, calendario semanal L–D).
+1. **`AgroFieldService` (`backend/app/routers/field_service.py`, `OrquideasApp/`):** Campos e Invernaderos Tradicionales — Caso Orquídeas (**Integración II `IEI-094`**, RF1–RF7, 80% HR, 18–24 °C, calendario semanal L–D).
 2. **`HomeTowerService` (`backend/app/routers/home_tower_service.py`, `firmware/`, `ASAIapp/`):** Mini Torre Hidropónica Domiciliaria (**Feria de Innovación + IoT `IEI-059` + Android `IEI-058`**).
 3. **`VerticalFarmService` (`backend/app/routers/vertical_farm_service.py`):** Invernadero Vertical Industrial (escalabilidad comercial y analítica multi-rack).
 
@@ -22,13 +22,17 @@ Usar exactamente estos comandos desde la raíz `C:\Users\Jonathan\Desktop\AGROSE
   ```powershell
   Push-Location backend; .\.venv\Scripts\python.exe -m pytest tests/test_api.py -v; Pop-Location
   ```
-* **Levantar Servidor Backend (`FastAPI` + `Uvicorn` en `http://localhost:8000`):**
+* **Levantar Servidor Backend (`FastAPI` + `Uvicorn`; usar `--host 0.0.0.0` si conectan celulares por Wi-Fi):**
   ```powershell
-  Push-Location backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000; Pop-Location
+  Push-Location backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000; Pop-Location
   ```
-* **Compilar App Android (`ASAIapp/` -> Debug APK):**
+* **Compilar App Android Mini Torre (`ASAIapp/` -> Debug APK):**
   ```powershell
   $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; Push-Location ASAIapp; .\gradlew.bat assembleDebug --no-daemon; Pop-Location
+  ```
+* **Compilar App Android Orquídeas (`OrquideasApp/` -> Debug APK):**
+  ```powershell
+  $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; $env:ANDROID_HOME = "C:\Users\Jonathan\AppData\Local\Android\Sdk"; Push-Location OrquideasApp; .\gradlew.bat assembleDebug --no-daemon; Pop-Location
   ```
 * **Firmware ESP32 (`firmware/esp32_asai_mqtt/esp32_asai_mqtt.ino`):**
   * Placa en Arduino IDE: `ESP32 Dev Module` (`115200` baudios).
@@ -67,8 +71,9 @@ Flujo obligatorio para toda feature o cambio estructural:
 
 ```text
 AGROSENSE_AI/
-├── AGENTS.md                           <- Este contrato operativo
-├── GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md  <- Mapa de estudio (6 preguntas) y diagnóstico
+├── AGENTS.md                              <- Este contrato operativo
+├── GUIA_ESTUDIO_Y_MAPA_DEL_SISTEMA.md     <- Mapa de estudio (6 preguntas) y diagnóstico
+├── INTEGRACION_EQUIPO_Y_ARQUITECTURA.md   <- Quién hizo qué, herramientas y unificación
 ├── specs/
 │   ├── spec-001-architecture-overview.md   <- SOA, DDL SQLite, contratos Pydantic y DPV Tetens
 │   ├── spec-002-field-greenhouse-service.md<- Servicio 1: Orquídeas (IEI-094 RF1-RF7)
@@ -80,9 +85,10 @@ AGROSENSE_AI/
 │   ├── spec-008-android-app.md             <- App Android ASAIapp (Java + Paho + CardView)
 │   ├── spec-009-academic-standards-and-tools.md <- Pautas docentes IEI-058 / IEI-059 / IEI-094
 │   └── PROGRESS_LOGS.md                    <- Matriz de estado y bitácora verificada
-├── backend/                            <- FastAPI + SQLite (`app/routers/`, `tests/test_api.py`)
-├── ASAIapp/                            <- Proyecto Android Studio Java + MQTT
-└── firmware/                           <- Sketch `.ino`, `diagram.json`, `libraries.txt` y guía ESP32
+├── backend/                               <- FastAPI + SQLite (`app/routers/`, `tests/test_api.py`)
+├── ASAIapp/                               <- App Android Servicio 2 (Java + Paho MQTT)
+├── OrquideasApp/                          <- App Android Servicio 1 (Java + Retrofit HTTP)
+└── firmware/                              <- Sketch `.ino`, `diagram.json`, `libraries.txt` y guía ESP32
 ```
 
 ---
