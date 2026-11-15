@@ -202,8 +202,8 @@ async def ingest_field_telemetry(data: FieldTelemetryInput):
 
 @router.get("/history")
 async def get_field_history(limit: int = 10):
-    """Consulta el registro histórico de condiciones ambientales (RF5)."""
-    records = db.get_telemetry_history(limit=limit)
+    """Consulta el registro histórico de condiciones ambientales filtrado por orquídeas (RF5)."""
+    records = db.get_telemetry_history(limit=limit, module_id=MODULE_ID)
     return {
         "modulo": MODULE_ID,
         "total_records": len(records),

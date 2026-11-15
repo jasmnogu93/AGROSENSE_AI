@@ -63,7 +63,7 @@ Proveer la lógica de negocio y endpoints necesarios para cumplir **al 100% los 
 | `POST` | `/api/v1/services/field/schedule` | Guarda y actualiza días y horas de riego (RF1) | `FieldScheduleUpdate` | Calendario confirmado o HTTP 400 si `active_days` está vacío |
 | `GET` | `/api/v1/services/field/notification` | Retorna próxima cita de riego calculada (RF2) | Ninguno | Día, hora, booleano `is_today` y mensaje |
 | `POST` | `/api/v1/services/field/telemetry` | Ingesta de lectura de sensores Wi-Fi (RF3, RF4) | `FieldTelemetryInput` | Telemetría registrada en `telemetria_historica` |
-| `GET` | `/api/v1/services/field/history` | Consulta histórica de datos ambientales (RF5) | Query param `?limit=10` | Lista de registros cronológicos |
+| `GET` | `/api/v1/services/field/history` | Consulta histórica filtrada exclusivamente para `invernadero-orquideas` (RF5) | Query param `?limit=10` | Lista de registros cronológicos del módulo de orquídeas |
 
 ---
 

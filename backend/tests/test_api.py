@@ -65,6 +65,9 @@ def test_field_schedule_validation_and_persistence(client):
 
 
 def test_field_telemetry_ingestion_and_history(client):
+    # Simular un evento en la Mini Torre (celda-01) para comprobar aislamiento de historial
+    assert client.post("/api/v1/simulate/optimo").status_code == 200
+
     post_res = client.post(
         "/api/v1/services/field/telemetry",
         json={"air_temperature": 21.2, "air_humidity": 80.5, "soil_humidity_pct": 71.0},
@@ -75,9 +78,11 @@ def test_field_telemetry_ingestion_and_history(client):
     assert status_res.json()["telemetry"]["air_humidity"] == 80.5
     assert status_res.json()["active_alerts"] == []
 
-    hist_res = client.get("/api/v1/services/field/history?limit=5")
+    hist_res = client.get("/api/v1/services/field/history?limit=10")
     assert hist_res.status_code == 200
-    assert hist_res.json()["total_records"] >= 1
+    body = hist_res.json()
+    assert body["total_records"] >= 1
+    assert all(r["modulo_id"] == "invernadero-orquideas" for r in body["history"])
 
 
 def test_home_tower_anti_cavitation_blocks_pump_under_20_percent(client):
