@@ -1,0 +1,12 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.OrquideaApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/asai_primary</item>
+        <item name="colorPrimaryDark">@color/asai_primary_dark</item>
+        <item name="colorSecondary">@color/asai_primary</item>
+        <item name="android:statusBarColor">@color/asai_primary</item>
+        <item name="android:navigationBarColor">@color/asai_surface</item>
+    </style>
+
+    <style name="Theme.OrquideaApp" parent="Base.Theme.OrquideaApp" />
+</resources>
