@@ -15,7 +15,9 @@ Esta guía te permite cargar el firmware oficial en tu **ESP32 DevKit V1**, cabl
    * **`PubSubClient`** (por *Nick O'Leary*)
    * **`DHT sensor library`** (por *Adafruit*) — *acepta instalar también `Adafruit Unified Sensor` si te lo pide.*
    * **`ESP32Servo`** (por *Kevin Harrington / John K. Bennett*)
-   * *(Nota: `WiFi.h`, `Stepper.h` y `math.h` ya vienen incluidos por defecto en Arduino IDE).*
+   * **`Adafruit BME280 Library`** (por *Adafruit*) — *acepta instalar todas sus dependencias (`Adafruit Unified Sensor` y `Adafruit BusIO`).*
+   * **`Adafruit BMP280 Library`** (por *Adafruit*) — *necesaria para la auto-detección automática si tu módulo es BMP280 en vez de BME280.*
+   * *(Nota: `WiFi.h`, `Wire.h`, `Stepper.h` y `math.h` ya vienen incluidos por defecto en Arduino IDE).*
 3. **Monitor Serial:** Configúralo siempre a **`115200 baud`**.
 
 ---
@@ -23,7 +25,7 @@ Esta guía te permite cargar el firmware oficial en tu **ESP32 DevKit V1**, cabl
 ## 2. Cómo cablear la Protoboard (Reglas de Oro)
 
 ### Regla Crítica: Tierra Común (`GND`) y Fuente de 5V
-* **Los sensores** (`DHT11`, `Nivel de agua`, `BME280` opcional) se alimentan con **`3.3V`** del **ESP32**.
+* **Los sensores** (`DHT11` Exterior, `Nivel de agua`, `BME280`/`BMP280` Interior) se alimentan con **`3.3V`** del **ESP32**.
 * **Los actuadores/motores** (`Relé + Bomba 5V`, `Servo SG90`, `Driver ULN2003 + PaP`) demandan mucha corriente y deben alimentarse desde el pin **`5V` del Arduino Uno R3** (usado solo como fuente de potencia).
 * **OBLIGATORIO:** Une con un cable jumper el pin **`GND` del ESP32** al riel **`GND` de la protoboard** y al **`GND` del Arduino Uno**. Sin `GND` común, ni el servo ni el relé ni el motor paso a paso funcionarán.
 
@@ -31,9 +33,9 @@ Esta guía te permite cargar el firmware oficial en tu **ESP32 DevKit V1**, cabl
 
 | Componente | Pin del Componente | Conectar a (ESP32 / Fuente) | Nota Importante |
 | :--- | :--- | :--- | :--- |
-| **DHT11** | `VCC` / `+` | **`3V3`** del ESP32 | Alimentación 3.3V |
-| **DHT11** | `DATA` / `OUT` | **`GPIO 4`** del ESP32 | Lectura Temp y Humedad |
-| **DHT11** | `GND` / `-` | **`GND`** común | Tierra |
+| **DHT11 (Exterior)** | `VCC` / `+` | **`3V3`** del ESP32 | Alimentación 3.3V |
+| **DHT11 (Exterior)** | `DATA` / `OUT` | **`GPIO 4`** del ESP32 | Lectura Temp y Humedad **Exterior** (`ASAI/Exterior/*`) |
+| **DHT11 (Exterior)** | `GND` / `-` | **`GND`** común | Tierra |
 | **Sensor Nivel Resistivo** | `VCC` / `+` | **`GPIO 25`** del ESP32 | **¡No a 3V3 directo!** GPIO 25 lo enciende solo 50 ms para evitar corrosión. |
 | **Sensor Nivel Resistivo** | `SIG` / `S` | **`GPIO 34`** del ESP32 | Lectura analógica (0–100%) |
 | **Sensor Nivel Resistivo** | `GND` / `-` | **`GND`** común | Tierra |
@@ -45,7 +47,8 @@ Esta guía te permite cargar el firmware oficial en tu **ESP32 DevKit V1**, cabl
 | **Servomotor SG90** | Naranja/Amarillo (`PWM`) | **`GPIO 18`** del ESP32 | Ventilación cenital (`0°` a `90°`) |
 | **ULN2003 (Motor PaP)** | `+` / `-` (5–12V) | **`5V` y `GND`** del Arduino Uno | Potencia aislada |
 | **ULN2003 (Motor PaP)** | `IN1, IN2, IN3, IN4` | **`GPIO 19, 23, 5, 13`** | **PROHIBIDO usar `GPIO 12`** (bloquea el arranque del ESP32) |
-| **BME280 *(opcional)*** | `SDA` / `SCL` | **`GPIO 21` / `GPIO 22`** | Solo si lo conectas y descomentas `#define USAR_BME280` |
+| **BME280 / BMP280 (Interior)** | `VCC` / `GND` | **`3V3`** y **`GND`** común | Habilitado por defecto con auto-detección en `0x76` y `0x77` |
+| **BME280 / BMP280 (Interior)** | `SDA` / `SCL` | **`GPIO 21` / `GPIO 22`** | `BME280`: Temp+Hum+Presión; `BMP280`: Temp+Presión (Hum usa respaldo DHT11); sin sensor: fallback a DHT11 y `1013.25 hPa` |
 
 ---
 
@@ -72,10 +75,12 @@ Abre **MQTTX** en el computador con esta configuración:
 * Suscríbete en MQTTX al comodín **`ASAI/#`** para ver todos los mensajes en vivo.
 
 ### Prueba 1: Telemetría en Vivo (ESP32 -> MQTTX -> `ASAIapp`)
-1. Conecta el ESP32 y abre el **Monitor Serial (`115200 baud`)**. Verifica `[WiFi] Conectado` y `[MQTT] CONECTADO`.
+1. Conecta el ESP32 y abre el **Monitor Serial (`115200 baud`)**. Verifica el bloque `[I2C]` (auto-detección `BME280` o `BMP280` en `0x76`/`0x77`, o fallback limpio), `[WiFi] Conectado` y `[MQTT] CONECTADO`.
 2. Cada **5 segundos** verás llegar en **MQTTX** y en **`ASAIapp`** los tópicos:
-   * `ASAI/Temperatura`, `ASAI/Humedad`, `ASAI/Nivel`, `ASAI/DPV`, `ASAI/Presion`, `ASAI/Bomba`, `ASAI/Alerta`.
-3. Acerca el dedo/aliento al `DHT11` y verifica que `Temperatura`, `Humedad` y `DPV` cambian en el celular sin reiniciar la app.
+   * **Interior Torre (`BME280`/`BMP280` o fallback DHT11):** `ASAI/Temperatura`, `ASAI/Humedad`, `ASAI/Presion`, `ASAI/DPV`. *(Si conectas un `BMP280`, su temperatura y presión son reales del chip, mientras `ASAI/Humedad` y `DPV` usan el `DHT11` como respaldo).*
+   * **Exterior Torre (`DHT11`):** `ASAI/Exterior/Temperatura` y `ASAI/Exterior/Humedad`.
+   * **Estanque y Actuadores:** `ASAI/Nivel`, `ASAI/Bomba`, `ASAI/Alerta`.
+3. Acerca el dedo/aliento al `DHT11` (exterior) o al `BME280`/`BMP280` (interior) y verifica en Monitor Serial, MQTTX y `ASAIapp` cómo se actualizan ambos bloques sin reiniciar la app.
 
 ### Prueba 2: Control de Actuadores (`ASAIapp` / MQTTX -> ESP32)
 1. Con el sensor de nivel sumergido (**`>= 20%`**):

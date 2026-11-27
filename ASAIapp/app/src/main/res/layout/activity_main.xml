@@ -72,7 +72,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="Temperatura:\n-- °C"
+                        android:text="Temp. Interior:\n-- °C"
                         android:textColor="#FF5722"
                         android:textSize="20sp" />
                 </LinearLayout>
@@ -107,9 +107,44 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="Humedad:\n-- %"
+                        android:text="Hum. Interior:\n-- %"
                         android:textColor="#03A9F4"
                         android:textSize="20sp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Tarjeta 2b: Clima Exterior (DHT11) -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardExteriorEnv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="@color/white"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="6dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:contentDescription="Icono clima exterior"
+                        android:src="@drawable/ic_thermometer" />
+
+                    <TextView
+                        android:id="@+id/txtExteriorEnv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="Exterior (DHT11):\n-- °C | -- %"
+                        android:textColor="@color/textoOscuro"
+                        android:textSize="18sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

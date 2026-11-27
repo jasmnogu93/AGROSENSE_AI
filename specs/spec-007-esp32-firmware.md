@@ -17,8 +17,8 @@ Implementar el firmware C++ (Arduino IDE / PlatformIO) para el microcontrolador 
 
 | Dispositivo / Sensor / Actuador | Pin ESP32 DevKit V1 | Alimentación | Regla Crítica de Hardware |
 | :--- | :--- | :--- | :--- |
-| **Sensor DHT11** | `GPIO 4` (DATA) | `3.3V` ESP32 | Lectura de Temperatura y Humedad Relativa (`<DHT.h>`). |
-| **Sensor BME280 / BMP280** | `GPIO 21` (SDA), `GPIO 22` (SCL) | `3.3V` ESP32 | Bus I2C estándar: temperatura precisa y presión barométrica (hPa). |
+| **Sensor DHT11 (Exterior Torre)** | `GPIO 4` (DATA) | `3.3V` ESP32 | Lectura ambiental **Exterior** (Temperatura y Humedad Relativa, `<DHT.h>`). |
+| **Sensor BME280 / BMP280 (Interior Torre)** | `GPIO 21` (SDA), `GPIO 22` (SCL) | `3.3V` ESP32 | Bus I2C estándar (**Interior** de la torre): auto-detección de chip `BME280` (Temp + Humedad + Presión) o `BMP280` (Temp + Presión, usando humedad de respaldo del DHT11 si falta sensor de humedad). |
 | **Sensor Nivel Resistivo** | `GPIO 34` (SIG ADC1) + `GPIO 25` (VCC Switch) | `3.3V` conmutado | **Anti-Electrólisis:** `GPIO 25` en `LOW` en reposo; poner `HIGH` solo **50 ms** antes de leer `GPIO 34`, y apagar inmediatamente a `LOW`. |
 | **Módulo Relé 1 Canal (Bomba 5V)** | `GPIO 26` (IN) | `5V` Arduino Uno | Aislado de la lógica 3.3V del ESP32; conmuta mini-bomba sumergible 5V. |
 | **Micro Servomotor SG90** | `GPIO 18` (PWM) | `5V` Arduino Uno | Control angular `0°` (cerrado) a `90°`/`180°` (ventilación cenital). |
@@ -41,11 +41,13 @@ Implementar el firmware C++ (Arduino IDE / PlatformIO) para el microcontrolador 
 Para mantener compatibilidad 100% directa con **MQTTX** y con la app **`ASAIapp`** (sin requerir parseo JSON en Java, siguiendo la pág. 15 de `Android + mqtt.pdf`), el ESP32 se conecta a **`broker.emqx.io`** (puerto **`1883`**, `QoS 0`, `Plaintext`, ID único `"ESP32_ASAI_01"`) usando un temporizador no bloqueante (`millis()`) para no congelar `client.loop()`.
 
 * **Publicación de Métricas en Tiempo Real (texto plano vía `client.publish(topico, String(valor).c_str())`):**
-  * `ASAI/Temperatura` -> ej. `"22.40"` (°C)
-  * `ASAI/Humedad` -> ej. `"60.50"` (%)
+  * `ASAI/Temperatura` -> ej. `"23.80"` (°C — **Interior** vía `BME280`/`BMP280`; fallback a `DHT11` si I2C no está conectado)
+  * `ASAI/Humedad` -> ej. `"68.50"` (% — **Interior** vía `BME280`; fallback a `DHT11` si el chip es `BMP280` o I2C no está conectado)
+  * `ASAI/Exterior/Temperatura` -> ej. `"21.40"` (°C — **Exterior** medida por `DHT11` en `GPIO 4`)
+  * `ASAI/Exterior/Humedad` -> ej. `"55.00"` (% — **Exterior** medida por `DHT11` en `GPIO 4`)
   * `ASAI/Nivel` -> ej. `"82.00"` (%)
-  * `ASAI/DPV` -> ej. `"1.05"` (kPa calculado con fórmula Tetens)
-  * `ASAI/Presion` -> ej. `"1014.20"` (hPa BME280)
+  * `ASAI/DPV` -> ej. `"1.05"` (kPa calculado con fórmula Tetens sobre Temp/Humedad interior)
+  * `ASAI/Presion` -> ej. `"1014.20"` (hPa vía `BME280`/`BMP280`, o `"1013.25"` por defecto)
   * `ASAI/Bomba` -> `"ON"` o `"OFF"`
   * `ASAI/Alerta` -> `"NORMAL"` o `"ESTANQUE_BAJO"`
 

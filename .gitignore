@@ -38,7 +38,27 @@ local.properties
 
 # Variables de entorno y secretos
 .env
+.env.*
+!.env.example
 *.local
+secrets.h
+google-services.json
+
+# Entregas académicas, carpetas personales y material binario local
+ENTREGA_INTEGRACION_II/
+ENTREGA_IOT/
+Integracion de competencias 2/
+Firabase/
+MATERIAL_AGENTS_MD/
+AndroidASAI/
+fotos/
+presentacion/
+logo.webp
+*.docx
+*.pptx
+GUIA_ESTUDIO_DEFENSA_FINAL_IOT.md
+GUIA_ESTUDIO_JONATHAN_ANDROID_Y_BD.md
+GUIA_ESTUDIO_MIGUEL_ESP32_FIRMWARE.md
 
 # Archivos de sistema operativo
 Thumbs.db

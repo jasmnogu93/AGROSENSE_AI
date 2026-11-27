@@ -16,7 +16,7 @@ La **Mini Torre Domiciliaria Inteligente** es un electrodoméstico agrícola par
 * **Protección Ciberfísica Contra Cavitación:** Apagado inmediato de la mini-bomba sumergible 5V si el sensor resistivo reporta menos del 20% de nivel de agua en el estanque.
 * **Control Climático Pasivo y Activo:** Servomotor SG90 que regula la ventilación cenital según el Déficit de Presión de Vapor (DPV) y la temperatura.
 * **Dosificación Automatizada de Nutrientes:** Motor paso a paso 28BYJ-48 con driver ULN2003 para suministro preciso de soluciones A y B.
-* **Control Nativo desde Android:** Conectividad y control remoto desde smartphone.
+* **Control Nativo desde Android & Web (MQTT Bidireccional):** Conectividad en tiempo real vía `broker.emqx.io:1883` conectando `ESP32` ↔ `ASAIapp` (Android) ↔ `Backend FastAPI / Dashboard Web` (con persistencia en SQLite).
 
 ---
 
@@ -39,10 +39,20 @@ La **Mini Torre Domiciliaria Inteligente** es un electrodoméstico agrícola par
 
 | Método | Endpoint | Descripción | Payload Request | Respuesta |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/services/home-tower/status` | Estado integral de la torre: nivel estanque, bomba, actuadores y DPV | Ninguno | HTTP 200: telemetría, actuadores, recirculación y seguridad |
+| `GET` | `/api/v1/services/home-tower/status` | Estado integral de la torre: nivel estanque, bomba, actuadores, DPV, clima exterior (`DHT11`) y estado del puente MQTT | Ninguno | HTTP 200: telemetría (incl. `exterior_temperature_c`, `exterior_humidity_pct`), actuadores, recirculación, seguridad y `mqtt` |
 | `POST` | `/api/v1/services/home-tower/recirculation` | Configura el intervalo y duración del ciclo de bombeo | `RecirculationUpdate` | HTTP 200: parámetros confirmados y `next_cycle_time` |
-| `POST` | `/api/v1/services/home-tower/actuators/command` | Comando manual directo a actuador (Bomba, Servo, Motor PaP) | `ActuatorCommand` | HTTP 200 (log en SQLite) o HTTP 400 (bloqueo cavitación) |
+| `POST` | `/api/v1/services/home-tower/actuators/command` | Comando manual directo a actuador (Bomba, Servo, Motor PaP); persiste en SQLite y publica al tópico MQTT `ASAI/*/cmd` | `ActuatorCommand` | HTTP 200 (`mqtt_published` + log SQLite) o HTTP 400 (bloqueo cavitación) |
 | `GET` | `/api/v1/services/home-tower/safety-check` | Evaluación de reglas de protección (cavitación y alivio térmico) | Ninguno | HTTP 200: `NORMAL`, `WARNING`, `CRITICAL` |
+
+---
+
+## 3.1. Puente MQTT Bidireccional en Backend (`backend/app/mqtt_bridge.py`)
+* **Broker:** `broker.emqx.io:1883` (`ASAI_MQTT_ENABLED=true` por defecto; desactivable en pruebas unitarias sin red).
+* **Suscripción (ESP32 → SQLite/Web):** `ASAI/Temperatura`, `ASAI/Humedad`, `ASAI/Exterior/Temperatura`, `ASAI/Exterior/Humedad`, `ASAI/Nivel`, `ASAI/DPV`, `ASAI/Presion`, `ASAI/Bomba`, `ASAI/Servo`, `ASAI/Alerta` actualizando `estado_modulo` (`celda-01`) y registrando serie temporal en `telemetria_historica`.
+* **Publicación (Web REST → ESP32/Android):**
+  * `bomba_agua` (`ON`/`OFF`) → `ASAI/Bomba/cmd` (solo si pasa el bloqueo `< 20%`).
+  * `servo_ventilacion` (`SET_ANGLE`) → `ASAI/Servo/cmd`.
+  * `motor_nutrientes` (`DISPENSE_STEPS`) → `ASAI/Nutrientes/cmd`.
 
 ---
 

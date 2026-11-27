@@ -60,10 +60,14 @@ Proveer la lógica de negocio y endpoints necesarios para cumplir **al 100% los 
 | :--- | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/services/field/status` | Estado actual del módulo de orquídeas y telemetría | Ninguno | Estado ambiental, perfil de orquídeas y alertas |
 | `GET` | `/api/v1/services/field/schedule` | Obtiene el calendario semanal de riego configurado (RF1) | Ninguno | Días activos, hora programada, próxima notificación |
-| `POST` | `/api/v1/services/field/schedule` | Guarda y actualiza días y horas de riego (RF1) | `FieldScheduleUpdate` | Calendario confirmado o HTTP 400 si `active_days` está vacío |
-| `GET` | `/api/v1/services/field/notification` | Retorna próxima cita de riego calculada (RF2) | Ninguno | Día, hora, booleano `is_today` y mensaje |
-| `POST` | `/api/v1/services/field/telemetry` | Ingesta de lectura de sensores Wi-Fi (RF3, RF4) | `FieldTelemetryInput` | Telemetría registrada en `telemetria_historica` |
-| `GET` | `/api/v1/services/field/history` | Consulta histórica filtrada exclusivamente para `invernadero-orquideas` (RF5) | Query param `?limit=10` | Lista de registros cronológicos del módulo de orquídeas |
+| `POST` | `/api/v1/services/field/schedule` | Guarda y actualiza días, hora y frecuencia opcional (RF1) | `FieldScheduleUpdate` | Calendario confirmado o HTTP 400 si `active_days` está vacío |
+| `GET` | `/api/v1/services/field/notification` | Retorna próxima cita de riego calculada y `is_due_now` (RF2) | Ninguno | Día, hora, booleano `is_today`, `is_due_now` y mensaje |
+| `POST` | `/api/v1/services/field/notification/trigger` | Registra y emite notificación activa de hora de riego (RF2) | Ninguno | Evento registrado en `alertas_sistema` |
+| `GET` | `/api/v1/services/field/sensors/check` | Verifica enlace Wi-Fi / Bluetooth y última lectura (RF3) | Ninguno | Estado del enlace y último timestamp |
+| `POST` | `/api/v1/services/field/sensors/connect` | Empareja sensores Wi-Fi/BT o entrega solución si falla (RF3) | `SensorConnectRequest` | Estado conectado o `troubleshooting[]` ante fallo |
+| `POST` | `/api/v1/services/field/telemetry` | Ingesta de lectura Wi-Fi/BT + alertas `<75%/>85%`, `18-24°C` (RF3, RF4) | `FieldTelemetryInput` | Telemetría en `telemetria_historica` y alertas en `alertas_sistema` |
+| `POST` | `/api/v1/services/field/history/frequency` | Configura frecuencia seleccionable de histórico (RF5) | `FieldFrequencyUpdate` | Frecuencia persistida (`frecuencia_registro_min`) |
+| `GET` | `/api/v1/services/field/history` | Consulta histórica filtrada exclusivamente para `invernadero-orquideas` (RF5) | Query param `?limit=12` | Lista cronológica filtrada + motor BD (`Supabase` / `SQLite`) |
 
 ---
 
@@ -82,13 +86,14 @@ Proveer la lógica de negocio y endpoints necesarios para cumplir **al 100% los 
     ```json
     {
       "status": "success",
-      "message": "Calendario de riego guardado en SQLite con éxito (RF1).",
+      "message": "Calendario de riego guardado en base de datos con éxito (RF1).",
       "active_days": ["Lun", "Mié", "Vie"],
       "irrigation_time": "08:30",
       "duration_minutes": 20,
+      "recording_frequency_minutes": 60,
       "notification": "🔔 Notificación de Riego (RF2): Próximo riego programado para ..."
     }
     ```
 * **`POST /api/v1/services/field/telemetry` (`FieldTelemetryInput`):**
-  * **Request:** `{ "air_temperature": 21.4, "air_humidity": 79.8, "soil_humidity_pct": 68.0 }` (`soil_humidity_pct` opcional).
-  * **Persistencia:** Tanto el calendario semanal (`calendario_semanal`) como el último estado operativo (`estado_modulo`) y la serie histórica (`telemetria_historica`) persisten en `backend/agrosense.db` mediante `backend/app/db.py`.
+  * **Request:** `{ "air_temperature": 21.4, "air_humidity": 79.8, "soil_humidity_pct": 68.0, "barometric_pressure_hpa": 1013.8 }` (`soil_humidity_pct` y `barometric_pressure_hpa` opcionales).
+  * **Persistencia:** Tanto el calendario semanal (`calendario_semanal`) como el último estado operativo (`estado_modulo`), alertas (`alertas_sistema`) y serie histórica (`telemetria_historica`) persisten en **Supabase PostgreSQL** (`backend/app/database_schema_supabase.sql`) cuando `SUPABASE_URL`/`SUPABASE_KEY` están configurados en `.env`, o en `backend/agrosense.db` (SQLite) como respaldo/pruebas aisladas mediante `backend/app/db.py`.

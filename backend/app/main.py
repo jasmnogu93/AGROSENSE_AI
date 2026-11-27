@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import httpx
@@ -9,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from app import db
 from app.config import settings
+from app.mqtt_bridge import mqtt_bridge
 from app.models import (
     PlantProfile,
     HydroponicModule,
@@ -21,10 +23,22 @@ from app.models import (
 )
 from app.routers import field_service, home_tower_service, vertical_farm_service
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ciclo de vida de FastAPI: inicia y apaga el puente MQTT y planificador de Orquídeas."""
+    mqtt_bridge.start()
+    field_service.start_orchid_scheduler()
+    try:
+        yield
+    finally:
+        await field_service.stop_orchid_scheduler()
+        mqtt_bridge.stop()
+
 app = FastAPI(
     title="AgroSense AI — Core Management Hub (SOA Tri-Servicio)",
     description="Hub SOA para: 1. AgroField (Orquídeas IEI-094), 2. HomeTower (Mini Torres Feria Innovación & Android), 3. VerticalFarm (Invernaderos Industriales)",
-    version="2.2.0"
+    version="2.2.0",
+    lifespan=lifespan,
 )
 
 # Montaje de Routers de Servicios Desacoplados (SOA)
@@ -246,7 +260,8 @@ async def dashboard(request: Request):
             "telemetry": live_tel,
             "jev": live_jev,
             "schedule": _build_schedule_summary(live_tel),
-            "history": db.get_telemetry_history(limit=8),
+            "history": db.get_telemetry_history(limit=12, module_id="invernadero-orquideas"),
+            "storage_info": db.get_storage_backend_info(),
             "recent_commands": recent_commands[-5:],
             "field_data": field_service.get_field_dashboard_data(),
             "home_tower_data": home_tower_service.get_home_tower_dashboard_data(),
@@ -333,12 +348,18 @@ async def send_actuator_command(cmd: ActuatorCommand):
         triggered_by=cmd.triggered_by,
         enforce_cavitation_lock=True,
     )
+    mqtt_published = mqtt_bridge.publish_actuator_command(
+        target=cmd.target,
+        action=cmd.action,
+        parameter_value=cmd.parameter_value,
+    )
     return {
         "status": "command_registered",
         "actuator": cmd.target,
         "action": cmd.action,
         "parameter_value": cmd.parameter_value,
         "triggered_by": cmd.triggered_by,
+        "mqtt_published": bool(mqtt_published),
         "message": f"Comando '{cmd.action}' registrado y guardado en base de datos para {cmd.target}."
     }
 

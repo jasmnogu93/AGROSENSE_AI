@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AgroSense AI — Hub de Servicios Agrícolas (SOA Tri-Servicio)</title>
   
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS CDN & Chart.js (Visualización Tiempo Real RF7) -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -69,9 +70,9 @@
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
         <span class="text-[11px] font-mono text-zinc-300">ESP32 Online</span>
       </div>
-      <div class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-        <span class="text-[11px] font-mono text-zinc-300">SQLite Activa</span>
+      <div id="storage-badge" class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-300" title="{{ storage_info.detail }}">
+        <span class="w-1.5 h-1.5 rounded-full {{ 'bg-emerald-500' if storage_info.connected else 'bg-amber-500' }}"></span>
+        <span id="storage-badge-label" class="text-[11px] font-mono text-zinc-300">{{ storage_info.label }}</span>
       </div>
       <a href="/docs" target="_blank" class="px-3 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition">
         API Swagger &rarr;
@@ -135,11 +136,57 @@
           Puntos de ajuste: Humedad relativa al <strong>80%</strong> (Rango 75%-85%) y Temperatura entre <strong>18 °C y 24 °C</strong>. Cumple RF1 a RF7.
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" onclick="toggleSensorConnectPanel()"
+                class="px-3 py-1.5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-medium border border-emerald-500/30 transition">
+          🔌 Conectar Sensores (RF3)
+        </button>
         <span class="text-[11px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-300 border border-zinc-800">
           Endpoint: <code class="text-emerald-400">/api/v1/services/field</code>
         </span>
       </div>
+    </div>
+
+    <!-- PANEL RF3: CONECTAR SENSORES (Wi-Fi / Bluetooth + Guía de Solución ante Fallos) -->
+    <div id="fieldSensorConnectPanel" class="hidden panel rounded-xl p-5 border border-emerald-500/30 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-sm font-semibold text-zinc-100">Conectar Sensores de Humedad y Temperatura</h3>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-emerald-400 border border-zinc-700">RF3</span>
+          </div>
+          <p class="text-xs text-zinc-400">Empareja sensores Wi-Fi (ESP32 / Wokwi) o Bluetooth y verifica la recepción de datos</p>
+        </div>
+        <button type="button" onclick="toggleSensorConnectPanel()" class="text-xs text-zinc-400 hover:text-zinc-200 self-end sm:self-center">Cerrar &times;</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        <div>
+          <label class="text-[11px] text-zinc-400 block mb-1">Protocolo de Conexión:</label>
+          <select id="fieldSensorProtocol" class="w-full bg-zinc-950 border border-zinc-700 rounded-md px-3 py-1.5 text-xs font-mono text-zinc-100">
+            <option value="Wi-Fi">Wi-Fi (ESP32 / Wokwi)</option>
+            <option value="Bluetooth">Bluetooth (HC-05 / BLE)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] text-zinc-400 block mb-1">ID del Dispositivo:</label>
+          <input id="fieldSensorDeviceId" type="text" value="{{ field_data.sensor_link.device_id }}"
+                 class="w-full bg-zinc-950 border border-zinc-700 rounded-md px-3 py-1.5 text-xs font-mono text-zinc-100">
+        </div>
+        <button type="button" onclick="connectOrchidSensors(false)"
+                class="py-1.5 px-3 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">
+          Conectar y Verificar
+        </button>
+        <button type="button" onclick="connectOrchidSensors(true)"
+                class="py-1.5 px-3 rounded-md bg-zinc-800 hover:bg-zinc-700 text-amber-300 text-xs font-medium border border-amber-500/30 transition">
+          Simular Fallo de Conexión
+        </button>
+      </div>
+
+      <div id="fieldSensorStatusBox" class="p-3 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
+        <span class="font-mono text-emerald-400">Estado:</span> {{ field_data.sensor_link.message }}
+      </div>
+      <div id="fieldSensorTroubleshoot" class="hidden p-3.5 rounded-lg bg-red-950/30 border border-red-500/30 text-xs text-red-200 space-y-1"></div>
     </div>
 
     <!-- GRID DE MÉTRICAS ESPECÍFICAS PARA ORQUÍDEAS (RF4, RF7) -->
@@ -151,14 +198,14 @@
           <span class="text-[10px] font-mono text-zinc-400">DHT11 / Wi-Fi</span>
         </div>
         <div>
-          <div class="text-2xl font-semibold font-mono tracking-tight text-emerald-400">
+          <div id="field-hum-val" class="text-2xl font-semibold font-mono tracking-tight text-emerald-400">
             {{ field_data.telemetry.air_humidity }}%
           </div>
           <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-2.5 overflow-hidden">
-            <div class="h-full rounded-full bg-emerald-500" style="width: {{ field_data.telemetry.air_humidity }}%"></div>
+            <div id="field-hum-bar" class="h-full rounded-full bg-emerald-500 transition-all duration-300" style="width: {{ field_data.telemetry.air_humidity }}%"></div>
           </div>
         </div>
-        <span class="text-[10px] text-zinc-400 mt-2 block">Punto óptimo caso: <strong>80%</strong></span>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Punto óptimo caso: <strong>80%</strong> (75–85%)</span>
       </div>
 
       <!-- Temperatura Ambiente (RF4) -->
@@ -167,7 +214,7 @@
           <span>Temperatura Invernadero</span>
           <span class="text-[10px] font-mono text-zinc-400">BME280 / Wi-Fi</span>
         </div>
-        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+        <div id="field-temp-val" class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
           {{ field_data.telemetry.air_temperature }}°C
         </div>
         <span class="text-[10px] text-zinc-400 mt-2 block">Rango óptimo: 18 °C - 24 °C</span>
@@ -179,7 +226,7 @@
           <span>Humedad de Sustrato</span>
           <span class="text-[10px] font-mono text-zinc-400">Sonda Raíz</span>
         </div>
-        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+        <div id="field-soil-val" class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
           {{ field_data.telemetry.soil_humidity_pct or 68.0 }}%
         </div>
         <span class="text-[10px] text-zinc-400 mt-2 block">Corteza y musgo sphagnum</span>
@@ -192,9 +239,35 @@
           <span class="text-[10px] font-mono text-zinc-400">BME280</span>
         </div>
         <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
-          1013.8 <span class="text-xs font-normal text-zinc-400">hPa</span>
+          <span id="field-press-val">{{ field_data.telemetry.barometric_pressure_hpa }}</span> <span class="text-xs font-normal text-zinc-400">hPa</span>
         </div>
-        <span class="text-[10px] text-zinc-400 mt-2 block">Presión ambiental a nivel</span>
+        <span class="text-[10px] text-zinc-400 mt-2 block">Lectura barométrica en vivo</span>
+      </div>
+    </div>
+
+    <!-- BANNER DE ALERTAS ACTIVAS DE RANGO ÓPTIMO (RF4) + PRUEBAS RÁPIDAS -->
+    <div id="field-alerts-panel" class="panel rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 {{ 'border-l-4 border-l-red-500 bg-red-950/15' if field_data.active_alerts else 'border-l-4 border-l-emerald-500/70' }}">
+      <div class="text-xs">
+        <span class="font-mono font-semibold {{ 'text-red-400' if field_data.active_alerts else 'text-emerald-400' }} block mb-0.5" id="field-alerts-title">
+          {{ '⚠️ ALERTA AMBIENTAL FUERA DE RANGO (RF4)' if field_data.active_alerts else '✅ Condiciones Ambientales dentro del Rango Óptimo (80% HR · 18–24 °C)' }}
+        </span>
+        <div id="field-alerts-list" class="text-zinc-300 space-y-0.5">
+          {% if field_data.active_alerts %}
+            {% for al in field_data.active_alerts %}<div>• {{ al }}</div>{% endfor %}
+          {% else %}
+            <div>Monitoreo continuo activo. Si la humedad sale de 75–85% o la temperatura de 18–24 °C se emitirá alerta automática.</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 shrink-0">
+        <button type="button" onclick="simulateFieldTelemetry(27.5, 58.0)"
+                class="px-2.5 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-amber-300 text-[11px] font-mono border border-zinc-700 transition">
+          ⚡ Simular Fuera de Rango
+        </button>
+        <button type="button" onclick="simulateFieldTelemetry(21.4, 80.2)"
+                class="px-2.5 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-emerald-300 text-[11px] font-mono border border-zinc-700 transition">
+          ✓ Enviar Lectura Óptima
+        </button>
       </div>
     </div>
 
@@ -247,14 +320,20 @@
           </div>
 
           <!-- Componente de Notificación de Riego (RF2) -->
-          <div class="flex items-start gap-2.5 p-3.5 rounded-lg bg-emerald-950/20 border border-emerald-900/40 text-xs text-zinc-300">
-            <span class="text-emerald-400 text-base">🔔</span>
-            <div class="flex-1">
-              <span class="font-medium text-emerald-300 block">Notificación de Hora de Riego (RF2):</span>
-              <span id="fieldDisplayNotification" class="text-zinc-300 block mt-0.5">
-                {{ field_data.notification.notification_message }}
-              </span>
+          <div id="fieldNotificationBox" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg {{ 'bg-amber-950/30 border border-amber-500/50' if field_data.notification.is_due_now else 'bg-emerald-950/20 border border-emerald-900/40' }} text-xs text-zinc-300">
+            <div class="flex items-start gap-2.5 flex-1">
+              <span class="text-emerald-400 text-base">🔔</span>
+              <div>
+                <span class="font-medium text-emerald-300 block">Notificación de Hora de Riego (RF2):</span>
+                <span id="fieldDisplayNotification" class="text-zinc-300 block mt-0.5">
+                  {{ field_data.notification.notification_message }}
+                </span>
+              </div>
             </div>
+            <button type="button" onclick="triggerOrchidIrrigationAlert()"
+                    class="px-2.5 py-1.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-[11px] font-mono border border-emerald-500/30 transition shrink-0">
+              Simular Hora de Riego
+            </button>
           </div>
 
           <!-- PANEL COLAPSABLE: Formulario de Configuración (RF1) -->
@@ -289,17 +368,84 @@
             <div class="pt-1">
               <button onclick="saveFieldSchedule()" id="fieldSaveBtn"
                       class="w-full py-2 rounded-md bg-zinc-100 hover:bg-white text-zinc-900 text-xs font-semibold transition">
-                Guardar Configuración en SQLite (RF1)
+                Guardar Configuración en Base de Datos (RF1)
               </button>
             </div>
           </div>
 
         </div>
 
+        <!-- GRÁFICO EN TIEMPO REAL: DATOS EN TIEMPO REAL (RF7) -->
+        <div class="panel rounded-xl p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold text-zinc-100">Datos en Tiempo Real (Gráfico Temp / Humedad)</h3>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-emerald-400 border border-zinc-700">RF7</span>
+              </div>
+              <p class="text-xs text-zinc-400">Meta de orquídeas: 80% HR y 18–24 °C (actualización automática cada 5 s)</p>
+            </div>
+            <span id="field-realtime-sync" class="text-[11px] font-mono text-zinc-400">En vivo</span>
+          </div>
+          <div class="h-52 w-full">
+            <canvas id="fieldRealtimeChart"></canvas>
+          </div>
+        </div>
+
       </div>
 
-      <!-- COLUMNA DERECHA (5 Cols): Histórico de Condiciones Ambientales (RF5, RF6) -->
+      <!-- COLUMNA DERECHA (5 Cols): Aspersión Wokwi + Histórico de Condiciones Ambientales (RF5, RF6) -->
       <div class="lg:col-span-5 space-y-6">
+
+        <!-- Control Manual y Automático de Aspersión (Wokwi ESP32 Pin 5 vía MQTT) -->
+        <div class="panel rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between pb-2.5 border-b border-zinc-800">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold text-zinc-100">Aspersión Invernadero (Wokwi Pin 5)</h3>
+                <span id="fieldPumpBadge" class="text-[10px] font-mono px-2 py-0.5 rounded {{ 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' if field_data.irrigation_control.pump_active else 'bg-zinc-800 text-zinc-400 border border-zinc-700' }}">
+                  {{ 'ENCENDIDA' if field_data.irrigation_control.pump_active else 'APAGADA' }}
+                </span>
+              </div>
+              <p class="text-[11px] text-zinc-400 mt-0.5">Auto-riego por calendario activo + control remoto MQTT</p>
+            </div>
+            <div class="flex gap-1.5">
+              <button type="button" onclick="controlFieldPump('ON')"
+                      class="px-2.5 py-1.5 rounded text-xs font-medium bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition">
+                Encender
+              </button>
+              <button type="button" onclick="controlFieldPump('OFF')"
+                      class="px-2.5 py-1.5 rounded text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">
+                Apagar
+              </button>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-medium text-zinc-200">Ciclo Automático de Demostración</span>
+              <span id="fieldDemoStatus" class="text-[10px] font-mono text-zinc-400">
+                {{ 'ACTIVO (' ~ field_data.irrigation_control.interval_seconds ~ 's / ' ~ field_data.irrigation_control.duration_seconds ~ 's)' if field_data.irrigation_control.demo_enabled else 'En espera' }}
+              </span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 items-end">
+              <div>
+                <label class="text-[10px] text-zinc-400 block mb-1">Cada (seg):</label>
+                <input id="fieldDemoInterval" type="number" min="5" max="3600" value="{{ field_data.irrigation_control.interval_seconds }}"
+                       class="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-xs font-mono text-zinc-100">
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-400 block mb-1">Regar (seg):</label>
+                <input id="fieldDemoDuration" type="number" min="2" max="300" value="{{ field_data.irrigation_control.duration_seconds }}"
+                       class="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-xs font-mono text-emerald-400">
+              </div>
+              <button type="button" id="fieldDemoBtn" onclick="toggleFieldDemoCycle()"
+                      class="py-1.5 px-2 rounded text-[11px] font-semibold transition {{ 'bg-red-500/20 text-red-300 border border-red-500/40' if field_data.irrigation_control.demo_enabled else 'bg-emerald-600 hover:bg-emerald-500 text-white' }}">
+                {{ '⏹ Detener' if field_data.irrigation_control.demo_enabled else '▶ Iniciar Demo' }}
+              </button>
+            </div>
+          </div>
+        </div>
         
         <div class="panel rounded-xl p-5">
           <div class="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
@@ -308,30 +454,49 @@
                 <h3 class="text-sm font-semibold text-zinc-100">Registro Histórico de Condiciones</h3>
                 <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">RF5 · RF6</span>
               </div>
-              <p class="text-xs text-zinc-400">Almacenado continuo en SQLite (Frecuencia 1h)</p>
+              <p class="text-xs text-zinc-400">
+                Almacenado en <strong id="fieldStorageEngine" class="text-zinc-200">{{ storage_info.engine }}</strong>
+                (cada <span id="fieldFreqLabel">{{ field_data.schedule.recording_frequency_minutes }}</span> min)
+              </p>
             </div>
             <button onclick="refreshHistory()" class="text-xs font-mono text-zinc-400 hover:text-zinc-200">
               ↻ Actualizar
             </button>
           </div>
 
-          <div class="overflow-x-auto">
+          <!-- Selector Funcional de Frecuencia de Registro (RF5) -->
+          <div class="flex items-center gap-2 mb-3 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800">
+            <label for="fieldInputFrequency" class="text-[11px] text-zinc-400 whitespace-nowrap">Frecuencia (RF5):</label>
+            <select id="fieldInputFrequency" class="flex-1 bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-xs font-mono text-zinc-100">
+              <option value="1" {% if field_data.schedule.recording_frequency_minutes == 1 %}selected{% endif %}>Cada 1 min (Demo)</option>
+              <option value="5" {% if field_data.schedule.recording_frequency_minutes == 5 %}selected{% endif %}>Cada 5 min</option>
+              <option value="15" {% if field_data.schedule.recording_frequency_minutes == 15 %}selected{% endif %}>Cada 15 min</option>
+              <option value="30" {% if field_data.schedule.recording_frequency_minutes == 30 %}selected{% endif %}>Cada 30 min</option>
+              <option value="60" {% if field_data.schedule.recording_frequency_minutes == 60 %}selected{% endif %}>Cada 1 hora (60 min)</option>
+            </select>
+            <button type="button" onclick="saveFieldFrequency()" id="fieldFreqBtn"
+                    class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-emerald-300 text-xs font-mono border border-zinc-700 transition">
+              Aplicar
+            </button>
+          </div>
+
+          <div class="overflow-x-auto max-h-72 overflow-y-auto">
             <table class="w-full text-left text-xs">
               <thead class="text-[10px] uppercase font-mono text-zinc-500 border-b border-zinc-800">
                 <tr>
                   <th class="py-2">Hora</th>
                   <th class="py-2">Temp</th>
                   <th class="py-2">Humedad</th>
-                  <th class="py-2">Presión</th>
+                  <th class="py-2">Origen</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
+              <tbody id="field-history-tbody" class="divide-y divide-zinc-800/60 font-mono text-zinc-300">
                 {% for row in history %}
                 <tr class="hover:bg-zinc-900/40">
                   <td class="py-1.5 text-[11px] text-zinc-400">{{ row.fecha_hora[-8:] if row.fecha_hora else '--' }}</td>
                   <td class="py-1.5">{{ row.temp_ambiente }}°C</td>
                   <td class="py-1.5 text-emerald-400">{{ row.humedad_ambiente }}%</td>
-                  <td class="py-1.5 text-zinc-400">{{ row.presion_atmosferica|int }} hPa</td>
+                  <td class="py-1.5 text-[10px] text-zinc-400">{{ row.origen_dato or 'WIFI_ESP32' }}</td>
                 </tr>
                 {% else %}
                 <tr>
@@ -341,7 +506,9 @@
               </tbody>
             </table>
           </div>
-          <span class="text-[10px] text-zinc-500 mt-3 block text-right font-mono">Tabla: telemetria_historica (SQLite)</span>
+          <span class="text-[10px] text-zinc-500 mt-3 block text-right font-mono">
+            Tabla: telemetria_historica (<span id="fieldTableStorageLabel">{{ storage_info.label }}</span>)
+          </span>
         </div>
 
       </div>
@@ -369,15 +536,25 @@
           Cultivo automatizado de frutillas y hortalizas en balcones/hogares. Recirculación continua, protección anti-cavitación y actuadores físicos.
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <span class="text-[11px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-300 border border-zinc-800">
           Endpoint: <code class="text-indigo-400">/api/v1/services/home-tower</code>
+        </span>
+        <span id="ht-mqtt-badge" class="text-[11px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
+          <span>MQTT: Conectando...</span>
+        </span>
+        <span class="text-[11px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+          Sinc: <span id="ht-last-sync" class="text-zinc-200">--:--:--</span>
         </span>
       </div>
     </div>
 
+    <!-- Feedback discreto para comandos y estados -->
+    <div id="ht-feedback" class="hidden text-xs font-mono p-3 rounded-lg border transition-all duration-300"></div>
+
     <!-- GRID DE TELEMETRÍA CIBERFÍSICA -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
       <!-- Nivel de Estanque con Alerta Anti-Cavitación -->
       <div class="panel rounded-xl p-4 flex flex-col justify-between">
         <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
@@ -385,50 +562,56 @@
           <span class="text-[10px] font-mono text-zinc-400">GPIO 34</span>
         </div>
         <div>
-          <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.reservoir_level_percent < 20 %}text-red-400{% else %}text-zinc-100{% endif %}">
+          <div id="ht-level-val" class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.reservoir_level_percent < 20 %}text-red-400{% else %}text-zinc-100{% endif %}">
             {{ telemetry.reservoir_level_percent }}%
           </div>
           <div class="w-full bg-zinc-800 h-1.5 rounded-full mt-2.5 overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-300 {% if telemetry.reservoir_level_percent < 20 %}bg-red-500{% else %}bg-emerald-500{% endif %}" style="width: {{ telemetry.reservoir_level_percent }}%"></div>
+            <div id="ht-level-bar" class="h-full rounded-full transition-all duration-300 {% if telemetry.reservoir_level_percent < 20 %}bg-red-500{% else %}bg-emerald-500{% endif %}" style="width: {{ telemetry.reservoir_level_percent }}%"></div>
           </div>
         </div>
         <span class="text-[10px] text-zinc-400 mt-2 block">Protección cavitación: &lt; 20%</span>
       </div>
 
-      <!-- Temperatura -->
+      <!-- Temperatura Interior (BME/BMP280) -->
       <div class="panel rounded-xl p-4 flex flex-col justify-between">
         <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
-          <span>Temperatura</span>
-          <span class="text-[10px] font-mono text-zinc-400">DHT11</span>
+          <span>Temp. Interior</span>
+          <span class="text-[10px] font-mono text-zinc-400">BME/BMP280</span>
         </div>
-        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+        <div id="ht-temp-val" class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
           {{ telemetry.air_temperature }}°C
         </div>
         <span class="text-[10px] text-zinc-400 mt-2 block">Óptimo: 18° - 24°C</span>
       </div>
 
-      <!-- Humedad Aérea -->
+      <!-- Humedad Interior (BME/BMP280) -->
       <div class="panel rounded-xl p-4 flex flex-col justify-between">
         <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
-          <span>Humedad Relativa</span>
-          <span class="text-[10px] font-mono text-zinc-400">DHT11</span>
+          <span>Hum. Interior</span>
+          <span class="text-[10px] font-mono text-zinc-400">BME/BMP280</span>
         </div>
-        <div class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
+        <div id="ht-hum-val" class="text-2xl font-semibold font-mono tracking-tight text-zinc-100">
           {{ telemetry.air_humidity }}%
         </div>
         <span class="text-[10px] text-zinc-400 mt-2 block">Rango: 55% - 75%</span>
       </div>
 
-      <!-- DPV Fisiológico -->
+      <!-- DPV Fisiológico y Presión Barométrica -->
       <div class="panel rounded-xl p-4 flex flex-col justify-between">
         <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
           <span>Déficit Presión Vapor</span>
           <span class="text-[10px] font-mono text-zinc-400">DPV</span>
         </div>
-        <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.vpd_kpa and telemetry.vpd_kpa > 1.2 %}text-amber-400{% else %}text-emerald-400{% endif %}">
-          {{ telemetry.vpd_kpa }} <span class="text-xs font-normal text-zinc-400">kPa</span>
+        <div>
+          <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.vpd_kpa and telemetry.vpd_kpa > 1.2 %}text-amber-400{% else %}text-emerald-400{% endif %}">
+            <span id="ht-dpv-val">{{ telemetry.vpd_kpa }}</span> <span class="text-xs font-normal text-zinc-400">kPa</span>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-2 pt-2 border-t border-zinc-800/60 font-mono">
+            <span>Presión:</span>
+            <span id="ht-pressure-val" class="text-zinc-200">{{ telemetry.barometric_pressure_hpa if telemetry.barometric_pressure_hpa else '1013.25' }} hPa</span>
+          </div>
         </div>
-        <span class="text-[10px] text-zinc-400 mt-2 block">Transpiración óptima</span>
+        <span class="text-[10px] text-zinc-400 mt-1 block">Transpiración óptima</span>
       </div>
 
       <!-- Estado Bomba 5V -->
@@ -437,10 +620,36 @@
           <span>Bomba Sumergible 5V</span>
           <span class="text-[10px] font-mono text-zinc-400">GPIO 26</span>
         </div>
-        <div class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.pump_active %}text-emerald-400{% else %}text-zinc-400{% endif %}">
+        <div id="ht-pump-val" class="text-2xl font-semibold font-mono tracking-tight {% if telemetry.pump_active %}text-emerald-400{% else %}text-zinc-400{% endif %}">
           {{ "ENCENDIDA" if telemetry.pump_active else "APAGADA" }}
         </div>
         <span class="text-[10px] text-zinc-400 mt-2 block">Relé 5V optoacoplado</span>
+      </div>
+
+      <!-- Clima Exterior (DHT11 - GPIO 4) & Actuadores Auxiliares -->
+      <div class="panel rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+          <span>Clima Exterior</span>
+          <span class="text-[10px] font-mono text-zinc-400">DHT11 • GPIO 4</span>
+        </div>
+        <div>
+          <div class="text-xl font-semibold font-mono tracking-tight text-zinc-100 flex items-baseline gap-1">
+            <span id="ht-ext-temp-val">--</span><span class="text-xs font-normal text-zinc-400">°C</span>
+            <span class="text-zinc-600 font-light">/</span>
+            <span id="ht-ext-hum-val">--</span><span class="text-xs font-normal text-zinc-400">%</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-zinc-800/60 space-y-1 text-[11px] font-mono">
+            <div class="flex items-center justify-between text-zinc-400">
+              <span>Servo (GPIO 18):</span>
+              <span id="ht-servo-val" class="text-zinc-200 font-semibold">{{ home_tower_data.state.vent_servo_angle }}°</span>
+            </div>
+            <div class="flex items-center justify-between text-zinc-400">
+              <span>Nutrientes:</span>
+              <span id="ht-steps-val" class="text-zinc-200 font-semibold">{{ home_tower_data.state.nutrient_dosing_steps }} pasos</span>
+            </div>
+          </div>
+        </div>
+        <span class="text-[10px] text-zinc-400 mt-1 block">Entorno externo / Dosif.</span>
       </div>
     </div>
 
@@ -546,12 +755,12 @@
               <h3 class="text-sm font-semibold text-zinc-100">Inferencia Ciberfísica System 1</h3>
               <p class="text-xs text-zinc-400">Decisiones automáticas de protección y alivio</p>
             </div>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded {% if jev.risk_level == 'CRITICAL' %}bg-red-500/10 text-red-400 border border-red-500/20{% elif jev.risk_level == 'WARNING' %}bg-amber-500/10 text-amber-400 border border-amber-500/20{% else %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% endif %}">
+            <span id="ht-jev-risk" class="text-[10px] font-mono px-2 py-0.5 rounded {% if jev.risk_level == 'CRITICAL' %}bg-red-500/10 text-red-400 border border-red-500/20{% elif jev.risk_level == 'WARNING' %}bg-amber-500/10 text-amber-400 border border-amber-500/20{% else %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% endif %}">
               {{ jev.risk_level }}
             </span>
           </div>
 
-          <p class="text-xs text-zinc-300 leading-relaxed p-3 rounded-lg bg-zinc-900 border border-zinc-800 font-mono">
+          <p id="ht-jev-reason" class="text-xs text-zinc-300 leading-relaxed p-3 rounded-lg bg-zinc-900 border border-zinc-800 font-mono">
             {{ jev.reason }}
           </p>
 
@@ -691,11 +900,332 @@
       if (activeBtn) {
         activeBtn.className = "service-tab-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-2 bg-zinc-200 text-zinc-950 font-semibold border-zinc-200 shadow-sm";
       }
+
+      if (targetTabId === 'tab-home-tower') {
+        refreshHomeTowerStatus();
+      } else if (targetTabId === 'tab-field') {
+        refreshFieldStatus();
+      }
     }
 
     function toggleFieldConfigPanel() {
       const p = document.getElementById('fieldConfigPanel');
       p.classList.toggle('hidden');
+    }
+
+    function toggleSensorConnectPanel() {
+      const p = document.getElementById('fieldSensorConnectPanel');
+      if (p) p.classList.toggle('hidden');
+    }
+
+    async function connectOrchidSensors(simulateFailure = false) {
+      const protocol = document.getElementById('fieldSensorProtocol').value;
+      const deviceId = document.getElementById('fieldSensorDeviceId').value.trim() || 'ESP32-Wokwi-Orquideas';
+      const statusBox = document.getElementById('fieldSensorStatusBox');
+      const troubleBox = document.getElementById('fieldSensorTroubleshoot');
+
+      try {
+        const res = await fetch('/api/v1/services/field/sensors/connect', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            protocol: protocol,
+            device_id: deviceId,
+            simulate_failure: simulateFailure
+          })
+        });
+        const data = await res.json();
+        if (data.connected) {
+          statusBox.className = "p-3 rounded-lg bg-emerald-950/25 border border-emerald-500/40 text-xs text-emerald-200";
+          statusBox.innerHTML = `<span class="font-mono font-semibold text-emerald-400">✅ Conectado (${data.protocol}):</span> ${data.message}`;
+          troubleBox.classList.add('hidden');
+          troubleBox.innerHTML = '';
+        } else {
+          statusBox.className = "p-3 rounded-lg bg-red-950/30 border border-red-500/40 text-xs text-red-200";
+          statusBox.innerHTML = `<span class="font-mono font-semibold text-red-400">❌ Fallo (${data.protocol}):</span> ${data.message}`;
+          troubleBox.innerHTML = `<div class="font-semibold text-red-300 mb-1">Instrucciones de Solución (Excepción RF3):</div>` +
+            (data.troubleshooting || []).map(step => `<div>${step}</div>`).join('');
+          troubleBox.classList.remove('hidden');
+        }
+      } catch (e) {
+        statusBox.innerText = 'Error verificando sensores: ' + e;
+      }
+    }
+
+    async function simulateFieldTelemetry(temp, hum) {
+      try {
+        const res = await fetch('/api/v1/services/field/telemetry', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            air_temperature: temp,
+            air_humidity: hum,
+            soil_humidity_pct: hum < 70 ? 48.0 : 72.0,
+            barometric_pressure_hpa: 1013.4,
+            source: 'WEB_DEMO_RF4'
+          })
+        });
+        if (res.ok) {
+          await refreshFieldStatus();
+        }
+      } catch (e) {
+        alert('Error enviando telemetría de prueba: ' + e);
+      }
+    }
+
+    async function triggerOrchidIrrigationAlert() {
+      try {
+        const res = await fetch('/api/v1/services/field/notification/trigger', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          const box = document.getElementById('fieldNotificationBox');
+          const txt = document.getElementById('fieldDisplayNotification');
+          if (box) box.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-amber-950/30 border border-amber-500/50 text-xs text-amber-200";
+          if (txt) txt.innerText = data.notification_message;
+          alert(data.notification_message);
+        }
+      } catch (e) {
+        alert('Error disparando notificación: ' + e);
+      }
+    }
+
+    async function saveFieldFrequency() {
+      const freq = parseInt(document.getElementById('fieldInputFrequency').value, 10);
+      const btn = document.getElementById('fieldFreqBtn');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/v1/services/field/history/frequency', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ recording_frequency_minutes: freq })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('fieldFreqLabel').innerText = data.recording_frequency_minutes;
+          alert(`✅ ${data.message}`);
+        }
+      } catch (e) {
+        alert('Error guardando frecuencia: ' + e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    let fieldChartInstance = null;
+    function renderFieldChart(historyRows) {
+      if (typeof Chart === 'undefined') return;
+      const canvas = document.getElementById('fieldRealtimeChart');
+      if (!canvas) return;
+      const ordered = [...(historyRows || [])].reverse();
+      const labels = ordered.map(r => (r.fecha_hora ? String(r.fecha_hora).slice(-8) : '--'));
+      const temps = ordered.map(r => Number(r.temp_ambiente));
+      const hums = ordered.map(r => Number(r.humedad_ambiente));
+
+      if (!fieldChartInstance) {
+        fieldChartInstance = new Chart(canvas.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Humedad Relativa (%) [Meta 80%]',
+                data: hums,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                tension: 0.3,
+                fill: true
+              },
+              {
+                label: 'Temperatura (°C) [18–24°C]',
+                data: temps,
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                tension: 0.3,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+              legend: { labels: { color: '#d4d4d8', font: { size: 11 } } }
+            },
+            scales: {
+              x: { ticks: { color: '#a1a1aa', font: { size: 10 } }, grid: { color: '#27272a' } },
+              y: { ticks: { color: '#a1a1aa', font: { size: 10 } }, grid: { color: '#27272a' }, suggestedMin: 0, suggestedMax: 100 }
+            }
+          }
+        });
+      } else {
+        fieldChartInstance.data.labels = labels;
+        fieldChartInstance.data.datasets[0].data = hums;
+        fieldChartInstance.data.datasets[1].data = temps;
+        fieldChartInstance.update();
+      }
+    }
+
+    async function refreshFieldStatus() {
+      try {
+        const [stRes, histRes] = await Promise.all([
+          fetch('/api/v1/services/field/status'),
+          fetch('/api/v1/services/field/history?limit=12')
+        ]);
+        if (stRes.ok) {
+          const stData = await stRes.json();
+          const tel = stData.telemetry || {};
+          const hum = Number(tel.air_humidity);
+          const temp = Number(tel.air_temperature);
+
+          const humEl = document.getElementById('field-hum-val');
+          const humBar = document.getElementById('field-hum-bar');
+          if (humEl && !Number.isNaN(hum)) {
+            humEl.innerText = `${hum.toFixed(1)}%`;
+            const outHum = hum < 75 || hum > 85;
+            humEl.className = `text-2xl font-semibold font-mono tracking-tight ${outHum ? 'text-red-400' : 'text-emerald-400'}`;
+            if (humBar) {
+              humBar.style.width = `${Math.min(100, Math.max(0, hum))}%`;
+              humBar.className = `h-full rounded-full transition-all duration-300 ${outHum ? 'bg-red-500' : 'bg-emerald-500'}`;
+            }
+          }
+          const tempEl = document.getElementById('field-temp-val');
+          if (tempEl && !Number.isNaN(temp)) {
+            tempEl.innerText = `${temp.toFixed(1)}°C`;
+            const outTemp = temp < 18 || temp > 24;
+            tempEl.className = `text-2xl font-semibold font-mono tracking-tight ${outTemp ? 'text-amber-400' : 'text-zinc-100'}`;
+          }
+          const soilEl = document.getElementById('field-soil-val');
+          if (soilEl && tel.soil_humidity_pct !== undefined && tel.soil_humidity_pct !== null) {
+            soilEl.innerText = `${Number(tel.soil_humidity_pct).toFixed(1)}%`;
+          }
+          const pressEl = document.getElementById('field-press-val');
+          if (pressEl && tel.barometric_pressure_hpa !== undefined && tel.barometric_pressure_hpa !== null) {
+            pressEl.innerText = Number(tel.barometric_pressure_hpa).toFixed(1);
+          }
+
+          // Alertas RF4
+          const alerts = stData.active_alerts || [];
+          const aPanel = document.getElementById('field-alerts-panel');
+          const aTitle = document.getElementById('field-alerts-title');
+          const aList = document.getElementById('field-alerts-list');
+          if (aPanel && aTitle && aList) {
+            if (alerts.length > 0) {
+              aPanel.className = "panel rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-l-4 border-l-red-500 bg-red-950/15";
+              aTitle.className = "font-mono font-semibold text-red-400 block mb-0.5";
+              aTitle.innerText = "⚠️ ALERTA AMBIENTAL FUERA DE RANGO (RF4)";
+              aList.innerHTML = alerts.map(a => `<div>• ${a}</div>`).join('');
+            } else {
+              aPanel.className = "panel rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-l-4 border-l-emerald-500/70";
+              aTitle.className = "font-mono font-semibold text-emerald-400 block mb-0.5";
+              aTitle.innerText = "✅ Condiciones Ambientales dentro del Rango Óptimo (80% HR · 18–24 °C)";
+              aList.innerHTML = "<div>Monitoreo continuo activo. Si la humedad sale de 75–85% o la temperatura de 18–24 °C se emitirá alerta automática.</div>";
+            }
+          }
+
+          // Storage & Timestamp
+          if (stData.storage) {
+            const sbLbl = document.getElementById('storage-badge-label');
+            const fEng = document.getElementById('fieldStorageEngine');
+            const fTblLbl = document.getElementById('fieldTableStorageLabel');
+            if (sbLbl) sbLbl.innerText = stData.storage.label;
+            if (fEng) fEng.innerText = stData.storage.engine;
+            if (fTblLbl) fTblLbl.innerText = stData.storage.label;
+          }
+
+          // Estado Bomba Aspersión Wokwi & Ciclo Demo
+          const ic = stData.irrigation_control;
+          if (ic) {
+            fieldDemoEnabledState = Boolean(ic.demo_enabled);
+            const pBadge = document.getElementById('fieldPumpBadge');
+            if (pBadge) {
+              pBadge.innerText = ic.pump_active ? 'ENCENDIDA' : 'APAGADA';
+              pBadge.className = `text-[10px] font-mono px-2 py-0.5 rounded ${ic.pump_active ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`;
+            }
+            const dStatus = document.getElementById('fieldDemoStatus');
+            const dBtn = document.getElementById('fieldDemoBtn');
+            if (dStatus) {
+              dStatus.innerText = ic.demo_enabled
+                ? `ACTIVO (${ic.interval_seconds}s / ${ic.duration_seconds}s)`
+                : 'En espera';
+              dStatus.className = `text-[10px] font-mono ${ic.demo_enabled ? 'text-emerald-400' : 'text-zinc-400'}`;
+            }
+            if (dBtn) {
+              dBtn.innerText = ic.demo_enabled ? '⏹ Detener' : '▶ Iniciar Demo';
+              dBtn.className = `py-1.5 px-2 rounded text-[11px] font-semibold transition ${ic.demo_enabled ? 'bg-red-500/20 text-red-300 border border-red-500/40' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`;
+            }
+          }
+
+          const syncEl = document.getElementById('field-realtime-sync');
+          if (syncEl) syncEl.innerText = `Sync: ${new Date().toTimeString().split(' ')[0]}`;
+        }
+
+        if (histRes.ok) {
+          const hData = await histRes.json();
+          const rows = hData.history || [];
+          const tbody = document.getElementById('field-history-tbody');
+          if (tbody) {
+            if (rows.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="4" class="py-3 text-center text-zinc-500">Sin lecturas históricas registradas.</td></tr>';
+            } else {
+              tbody.innerHTML = rows.map(r => `
+                <tr class="hover:bg-zinc-900/40">
+                  <td class="py-1.5 text-[11px] text-zinc-400">${r.fecha_hora ? String(r.fecha_hora).slice(-8) : '--'}</td>
+                  <td class="py-1.5">${r.temp_ambiente}°C</td>
+                  <td class="py-1.5 text-emerald-400">${r.humedad_ambiente}%</td>
+                  <td class="py-1.5 text-[10px] text-zinc-400">${r.origen_dato || 'WIFI_ESP32'}</td>
+                </tr>
+              `).join('');
+            }
+          }
+          renderFieldChart(rows);
+        }
+      } catch (err) {
+        console.warn('Error sincronizando Orquídeas:', err);
+      }
+    }
+
+    let fieldDemoEnabledState = {{ 'true' if field_data.irrigation_control.demo_enabled else 'false' }};
+
+    async function controlFieldPump(action) {
+      try {
+        const res = await fetch('/api/v1/services/field/pump', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: action })
+        });
+        if (res.ok) {
+          await refreshFieldStatus();
+        }
+      } catch (e) {
+        alert('Error enviando comando a aspersión Wokwi: ' + e);
+      }
+    }
+
+    async function toggleFieldDemoCycle() {
+      const intervalSec = parseInt(document.getElementById('fieldDemoInterval').value, 10) || 10;
+      const durationSec = parseInt(document.getElementById('fieldDemoDuration').value, 10) || 5;
+      const nextEnabled = !fieldDemoEnabledState;
+
+      try {
+        const res = await fetch('/api/v1/services/field/demo-cycle', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            enabled: nextEnabled,
+            interval_seconds: intervalSec,
+            duration_seconds: durationSec
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.detail || 'Error configurando ciclo demo');
+          return;
+        }
+        await refreshFieldStatus();
+      } catch (e) {
+        alert('Error activando ciclo demo: ' + e);
+      }
     }
 
     function toggleFieldDay(dia) {
@@ -752,7 +1282,7 @@
           });
 
           toggleFieldConfigPanel();
-          alert(`✅ Configuración guardada en SQLite (RF1):\n• Días: ${data.active_days.join(', ')}\n• Hora: ${data.irrigation_time} hrs\n• Duración: ${data.duration_minutes} min`);
+          alert(`✅ Configuración guardada en Base de Datos (RF1):\n• Días: ${data.active_days.join(', ')}\n• Hora: ${data.irrigation_time} hrs\n• Duración: ${data.duration_minutes} min`);
         } else {
           alert('Error actualizando calendario: ' + JSON.stringify(data));
         }
@@ -760,7 +1290,163 @@
         alert('Error al conectar con la API de Orquídeas: ' + e);
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Guardar Configuración en SQLite (RF1)';
+        btn.innerText = 'Guardar Configuración en Base de Datos (RF1)';
+      }
+    }
+
+    let feedbackTimeout = null;
+    function showHomeTowerFeedback(msg, type = 'info') {
+      const fb = document.getElementById('ht-feedback');
+      if (!fb) return;
+      if (feedbackTimeout) clearTimeout(feedbackTimeout);
+
+      let colorClasses = "bg-zinc-800/90 text-zinc-300 border-zinc-700";
+      if (type === 'success') {
+        colorClasses = "bg-emerald-500/10 text-emerald-300 border-emerald-500/30";
+      } else if (type === 'error') {
+        colorClasses = "bg-red-500/10 text-red-300 border-red-500/30";
+      } else if (type === 'warning') {
+        colorClasses = "bg-amber-500/10 text-amber-300 border-amber-500/30";
+      }
+
+      fb.className = `text-xs font-mono p-3 rounded-lg border transition-all duration-300 flex items-center justify-between ${colorClasses}`;
+      fb.innerHTML = `<span>${msg}</span><button type="button" onclick="document.getElementById('ht-feedback').classList.add('hidden')" class="ml-2 text-zinc-400 hover:text-zinc-200 text-sm font-bold leading-none">&times;</button>`;
+      fb.classList.remove('hidden');
+
+      if (type !== 'error') {
+        feedbackTimeout = setTimeout(() => {
+          fb.classList.add('hidden');
+        }, 5000);
+      }
+    }
+
+    async function refreshHomeTowerStatus() {
+      try {
+        const [statusRes, safetyRes] = await Promise.all([
+          fetch('/api/v1/services/home-tower/status'),
+          fetch('/api/v1/services/home-tower/safety-check')
+        ]);
+
+        if (statusRes.ok) {
+          const sData = await statusRes.json();
+          const tel = sData.telemetry || {};
+          const act = sData.actuators || {};
+          const mqtt = sData.mqtt || {};
+
+          // Nivel de Solución
+          const lvl = (tel.reservoir_level_pct !== undefined && tel.reservoir_level_pct !== null)
+            ? Number(tel.reservoir_level_pct)
+            : null;
+          const lvlEl = document.getElementById('ht-level-val');
+          const lvlBar = document.getElementById('ht-level-bar');
+          if (lvl !== null && lvlEl && lvlBar) {
+            lvlEl.innerText = `${lvl.toFixed(1)}%`;
+            lvlBar.style.width = `${Math.min(100, Math.max(0, lvl))}%`;
+            if (lvl < 20) {
+              lvlEl.className = "text-2xl font-semibold font-mono tracking-tight text-red-400";
+              lvlBar.className = "h-full rounded-full transition-all duration-300 bg-red-500";
+            } else {
+              lvlEl.className = "text-2xl font-semibold font-mono tracking-tight text-zinc-100";
+              lvlBar.className = "h-full rounded-full transition-all duration-300 bg-emerald-500";
+            }
+          }
+
+          // Temp Interior (BME/BMP280)
+          const tempEl = document.getElementById('ht-temp-val');
+          if (tempEl && tel.temperature_c !== undefined && tel.temperature_c !== null) {
+            tempEl.innerText = `${Number(tel.temperature_c).toFixed(1)}°C`;
+          }
+
+          // Hum Interior (BME/BMP280)
+          const humEl = document.getElementById('ht-hum-val');
+          if (humEl && tel.humidity_pct !== undefined && tel.humidity_pct !== null) {
+            humEl.innerText = `${Number(tel.humidity_pct).toFixed(1)}%`;
+          }
+
+          // DPV Fisiológico
+          const dpvEl = document.getElementById('ht-dpv-val');
+          if (dpvEl && tel.dpv_kpa !== undefined && tel.dpv_kpa !== null) {
+            dpvEl.innerText = Number(tel.dpv_kpa).toFixed(2);
+          }
+
+          // Presión Barométrica
+          const pressEl = document.getElementById('ht-pressure-val');
+          if (pressEl && tel.pressure_hpa !== undefined && tel.pressure_hpa !== null) {
+            pressEl.innerText = `${Number(tel.pressure_hpa).toFixed(1)} hPa`;
+          }
+
+          // Bomba Sumergible 5V
+          const pumpEl = document.getElementById('ht-pump-val');
+          if (pumpEl && act.pump_active !== undefined) {
+            pumpEl.innerText = act.pump_active ? "ENCENDIDA" : "APAGADA";
+            pumpEl.className = `text-2xl font-semibold font-mono tracking-tight ${act.pump_active ? 'text-emerald-400' : 'text-zinc-400'}`;
+          }
+
+          // Clima Exterior (DHT11 - GPIO 4)
+          const extTempEl = document.getElementById('ht-ext-temp-val');
+          if (extTempEl) {
+            extTempEl.innerText = (tel.exterior_temperature_c !== undefined && tel.exterior_temperature_c !== null)
+              ? Number(tel.exterior_temperature_c).toFixed(1)
+              : '--';
+          }
+          const extHumEl = document.getElementById('ht-ext-hum-val');
+          if (extHumEl) {
+            extHumEl.innerText = (tel.exterior_humidity_pct !== undefined && tel.exterior_humidity_pct !== null)
+              ? Number(tel.exterior_humidity_pct).toFixed(1)
+              : '--';
+          }
+
+          // Servo y Nutrientes
+          const servoEl = document.getElementById('ht-servo-val');
+          if (servoEl && act.vent_servo_angle !== undefined) {
+            servoEl.innerText = `${act.vent_servo_angle}°`;
+          }
+          const stepsEl = document.getElementById('ht-steps-val');
+          if (stepsEl && act.nutrient_steps !== undefined) {
+            stepsEl.innerText = `${act.nutrient_steps} pasos`;
+          }
+
+          // Badge de Conexión MQTT
+          const mqttBadge = document.getElementById('ht-mqtt-badge');
+          if (mqttBadge) {
+            if (mqtt.connected) {
+              mqttBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span><span class="text-emerald-400">MQTT: Conectado</span>';
+            } else if (mqtt.enabled === false) {
+              mqttBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span><span class="text-zinc-400">MQTT: Deshabilitado</span>';
+            } else {
+              mqttBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><span class="text-amber-400">MQTT: Desconectado</span>';
+            }
+          }
+
+          // Sincronización horaria
+          const syncEl = document.getElementById('ht-last-sync');
+          if (syncEl) {
+            const d = new Date();
+            syncEl.innerText = d.toTimeString().split(' ')[0];
+          }
+        }
+
+        // Reglas Ciberfísicas JEV / Safety
+        if (safetyRes.ok) {
+          const safeData = await safetyRes.json();
+          const riskEl = document.getElementById('ht-jev-risk');
+          const reasonEl = document.getElementById('ht-jev-reason');
+          if (riskEl && safeData.risk_level) {
+            riskEl.innerText = safeData.risk_level;
+            if (safeData.risk_level === 'CRITICAL') {
+              riskEl.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20";
+            } else if (safeData.risk_level === 'WARNING') {
+              riskEl.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20";
+            } else {
+              riskEl.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+            }
+          }
+          if (reasonEl && safeData.reason) {
+            reasonEl.innerText = safeData.reason;
+          }
+        }
+      } catch (err) {
+        console.warn('Error en sincronización HomeTower:', err);
       }
     }
 
@@ -782,12 +1468,14 @@
         });
         const data = await res.json();
         if (res.ok) {
-          alert(`Comando ejecutado: ${data.message}`);
-          location.reload();
+          await refreshHomeTowerStatus();
+          showHomeTowerFeedback(`✅ Comando ejecutado: ${data.message || action + ' en ' + target}`, 'success');
         } else {
+          showHomeTowerFeedback(`⚠️ Aviso de Protección: ${data.detail || JSON.stringify(data)}`, 'error');
           alert(`Aviso de Protección: ${data.detail || JSON.stringify(data)}`);
         }
       } catch (e) {
+        showHomeTowerFeedback('Error enviando comando: ' + e, 'error');
         alert('Error enviando comando: ' + e);
       }
     }
@@ -796,11 +1484,33 @@
       try {
         const res = await fetch(`/api/v1/simulate/${scenario}`, { method: 'POST' });
         await res.json();
-        location.reload();
+        const htTab = document.getElementById('tab-home-tower');
+        if (htTab && !htTab.classList.contains('hidden')) {
+          await refreshHomeTowerStatus();
+          showHomeTowerFeedback(`⚡ Escenario '${scenario}' simulado con éxito.`, 'warning');
+        } else {
+          location.reload();
+        }
       } catch (e) {
         alert('Error en simulación: ' + e);
       }
     }
+
+    // Polling periódico (5s normal; 2.5s si el ciclo demo está activo)
+    let pollTick = 0;
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshFieldStatus();
+    });
+    setInterval(() => {
+      pollTick += 1;
+      const htTab = document.getElementById('tab-home-tower');
+      const fieldTab = document.getElementById('tab-field');
+      if (htTab && !htTab.classList.contains('hidden')) {
+        if (pollTick % 2 === 0) refreshHomeTowerStatus();
+      } else if (fieldTab && !fieldTab.classList.contains('hidden')) {
+        if (fieldDemoEnabledState || pollTick % 2 === 0) refreshFieldStatus();
+      }
+    }, 2500);
 
     async function sendChat() {
       const input = document.getElementById('chatInput');
@@ -835,7 +1545,7 @@
     }
 
     function refreshHistory() {
-      location.reload();
+      refreshFieldStatus();
     }
   </script>
 </body>

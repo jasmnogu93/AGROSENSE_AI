@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -25,7 +27,7 @@ import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -33,16 +35,20 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 public class MainActivity extends AppCompatActivity {
 
-    private TextView txtTemperature, txtHumidity, txtWaterLevel, txtVpd, txtMqttStatus, txtActuatorStatus;
+    private TextView txtTemperature, txtHumidity, txtExteriorEnv, txtWaterLevel, txtVpd, txtMqttStatus, txtActuatorStatus;
     private ProgressBar progressWaterLevel;
     private Button btnPumpOn, btnPumpOff, btnVentOpen, btnVentClose, btnDoseNutrients;
     private MqttAsyncClient mqttClient;
 
     private float currentWaterLevel = 100.0f;
+    private String currentExtTemp = "--";
+    private String currentExtHum = "--";
     private String currentVpd = "--";
     private String currentPressure = "--";
     private String currentPumpState = "OFF";
     private String currentServoAngle = "0°";
+    private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
+    private boolean isDestroyedFlag = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
 
         txtTemperature = findViewById(R.id.txtTemperature);
         txtHumidity = findViewById(R.id.txtHumidity);
+        txtExteriorEnv = findViewById(R.id.txtExteriorEnv);
         txtWaterLevel = findViewById(R.id.txtWaterLevel);
         txtVpd = findViewById(R.id.txtVpd);
         txtMqttStatus = findViewById(R.id.txtMqttStatus);
@@ -78,6 +85,7 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+    // -- Aqui los botones de Android validan nivel (>= 20%) y PUBLICAN ordenes hacia el ESP32 --
     private void setupControlButtons() {
         btnPumpOn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -131,9 +139,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    // -- Aqui la app Android PUBLICA un mensaje MQTT al broker en el topico /cmd hacia el ESP32 --
     private void publishCommand(String topic, String payload, String toastMessage) {
         if (mqttClient == null || !mqttClient.isConnected()) {
-            Toast.makeText(MainActivity.this, "Sin conexión al broker MQTT", Toast.LENGTH_SHORT).show();
+            Toast.makeText(MainActivity.this, "Reconectando con broker MQTT, intenta en un segundo...", Toast.LENGTH_SHORT).show();
             return;
         }
         try {
@@ -147,28 +156,56 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // -- Aqui Android crea el cliente asincrono MQTT, activa reconexion automatica y se conecta a broker.emqx.io --
     private void connectToMqtt() {
+        if (isDestroyedFlag) {
+            return;
+        }
         String mqttServer = "tcp://broker.emqx.io:1883";
-        String clientId = "AndroidClient_ASAI_" + (System.currentTimeMillis() % 10000);
+        String clientId = MqttClient.generateClientId();
         try {
+            if (mqttClient != null) {
+                try {
+                    mqttClient.close();
+                } catch (Exception ignored) {
+                }
+            }
             mqttClient = new MqttAsyncClient(mqttServer, clientId, null);
             MqttConnectOptions options = new MqttConnectOptions();
             options.setCleanSession(true);
+            options.setAutomaticReconnect(true);
+            options.setKeepAliveInterval(30);
+            options.setConnectionTimeout(15);
 
-            mqttClient.setCallback(new MqttCallback() {
+            mqttClient.setCallback(new MqttCallbackExtended() {
                 @Override
-                public void connectionLost(Throwable cause) {
-                    String reason = cause != null ? cause.getMessage() : "desconocida";
-                    Log.d("MQTT", "Conexión perdida: " + reason);
+                public void connectComplete(boolean reconnect, String serverURI) {
+                    Log.d("MQTT", "Conectado (reconnect=" + reconnect + ") a " + serverURI);
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            txtMqttStatus.setText("MQTT: Conexión perdida");
-                            txtMqttStatus.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.Rojo));
+                            txtMqttStatus.setText("MQTT: Conectado a broker.emqx.io");
+                            txtMqttStatus.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.Verde));
+                        }
+                    });
+                    // -- Aqui al conectar o reconectar, Android vuelve a llamar subscribeToTopics() --
+                    subscribeToTopics();
+                }
+
+                @Override
+                public void connectionLost(Throwable cause) {
+                    String reason = cause != null ? cause.getMessage() : "desconocida";
+                    Log.d("MQTT", "Conexión perdida: " + reason + " (auto-reconexión activa)");
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            txtMqttStatus.setText("MQTT: Reconectando...");
+                            txtMqttStatus.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.Amarillo));
                         }
                     });
                 }
 
+                // -- Aqui Android RECIBE cada dato enviado del ESP32 y lo pasa a la pantalla con LocalBroadcastManager --
                 @Override
                 public void messageArrived(String topic, MqttMessage message) {
                     String payload = message.toString();
@@ -178,6 +215,10 @@ public class MainActivity extends AppCompatActivity {
                         intent.putExtra("temperature", payload);
                     } else if (topic.equals("ASAI/Humedad") || topic.equals("ESP8266/Humedad")) {
                         intent.putExtra("humidity", payload);
+                    } else if (topic.equals("ASAI/Exterior/Temperatura")) {
+                        intent.putExtra("ext_temperature", payload);
+                    } else if (topic.equals("ASAI/Exterior/Humedad")) {
+                        intent.putExtra("ext_humidity", payload);
                     } else if (topic.equals("ASAI/Nivel")) {
                         intent.putExtra("level", payload);
                     } else if (topic.equals("ASAI/DPV")) {
@@ -217,14 +258,22 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
                     String errorMsg = exception != null ? exception.getMessage() : "sin detalle";
-                    Log.e("MQTT", "Error al conectar: " + errorMsg);
+                    Log.e("MQTT", "Error al conectar: " + errorMsg + " — reintentando en 3s");
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            txtMqttStatus.setText("MQTT: Error al conectar");
+                            txtMqttStatus.setText("MQTT: Reintentando conexión...");
                             txtMqttStatus.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.Rojo));
                         }
                     });
+                    if (!isDestroyedFlag) {
+                        reconnectHandler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                connectToMqtt();
+                            }
+                        }, 3000);
+                    }
                 }
             });
         } catch (MqttException e) {
@@ -232,10 +281,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // -- Aqui se crean las suscripciones y el cliente Android se SUSCRIBE para escuchar los datos enviados del ESP32 --
     private void subscribeToTopics() {
         String[] topics = new String[]{
                 "ASAI/Temperatura",
                 "ASAI/Humedad",
+                "ASAI/Exterior/Temperatura",
+                "ASAI/Exterior/Humedad",
                 "ASAI/Nivel",
                 "ASAI/DPV",
                 "ASAI/Presion",
@@ -255,12 +307,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // -- Aqui la pantalla principal de Android recibe el broadcast interno y actualiza las tarjetas en vivo --
     // Receptor de difusión para recibir datos de MQTT
     private final BroadcastReceiver mqttReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String temperature = intent.getStringExtra("temperature");
             String humidity = intent.getStringExtra("humidity");
+            String extTemperature = intent.getStringExtra("ext_temperature");
+            String extHumidity = intent.getStringExtra("ext_humidity");
             String level = intent.getStringExtra("level");
             String vpd = intent.getStringExtra("vpd");
             String pressure = intent.getStringExtra("pressure");
@@ -269,10 +324,18 @@ public class MainActivity extends AppCompatActivity {
             String alert = intent.getStringExtra("alert");
 
             if (temperature != null) {
-                txtTemperature.setText("Temperatura:\n" + temperature + " °C");
+                txtTemperature.setText("Temp. Interior:\n" + temperature + " °C");
             }
             if (humidity != null) {
-                txtHumidity.setText("Humedad:\n" + humidity + " %");
+                txtHumidity.setText("Hum. Interior:\n" + humidity + " %");
+            }
+            if (extTemperature != null) {
+                currentExtTemp = extTemperature;
+                txtExteriorEnv.setText("Exterior (DHT11):\n" + currentExtTemp + " °C | " + currentExtHum + " %");
+            }
+            if (extHumidity != null) {
+                currentExtHum = extHumidity;
+                txtExteriorEnv.setText("Exterior (DHT11):\n" + currentExtTemp + " °C | " + currentExtHum + " %");
             }
             if (level != null) {
                 updateWaterLevelCard(level);
@@ -331,11 +394,16 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        isDestroyedFlag = true;
+        reconnectHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mqttReceiver);
         try {
-            if (mqttClient != null && mqttClient.isConnected()) {
-                mqttClient.disconnect();
+            if (mqttClient != null) {
+                if (mqttClient.isConnected()) {
+                    mqttClient.disconnect();
+                }
+                mqttClient.close();
             }
         } catch (MqttException e) {
             Log.e("MQTT", "Error al desconectar: " + e.getMessage());

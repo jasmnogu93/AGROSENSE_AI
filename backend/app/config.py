@@ -25,9 +25,17 @@ class Settings:
     JEV_DECISIONS_API_URL: str = os.getenv("JEV_DECISIONS_API_URL", "https://openrouter.ai/api/alpha/decisions")
     
     # Token de seguridad para dispositivos en terreno
-    JEV_DEVICE_AUTH_TOKEN: str = os.getenv("JEV_DEVICE_AUTH_TOKEN", "default_secret_token")
+    JEV_DEVICE_AUTH_TOKEN: str = os.getenv("JEV_DEVICE_AUTH_TOKEN", "")
     
-    # Base de Datos
+    # Base de Datos (SQLite local por defecto + Supabase PostgreSQL Cloud)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./agrosense.db")
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "").strip()
+
+    # Puente MQTT IoT ASAI (broker.emqx.io)
+    MQTT_ENABLED: bool = os.getenv("ASAI_MQTT_ENABLED", "true").lower() == "true"
+    MQTT_BROKER_HOST: str = os.getenv("MQTT_BROKER_HOST", "broker.emqx.io")
+    MQTT_BROKER_PORT: int = int(os.getenv("MQTT_BROKER_PORT", "1883"))
+    MQTT_CLIENT_ID_PREFIX: str = os.getenv("MQTT_CLIENT_ID_PREFIX", "AGROSENSE_Backend_")
 
 settings = Settings()

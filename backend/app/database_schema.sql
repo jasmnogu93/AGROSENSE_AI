@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS calendario_semanal (
     hora_riego VARCHAR(10) NOT NULL DEFAULT '08:30',
     duracion_minutos INTEGER NOT NULL DEFAULT 20,
     intervalo_horas INTEGER NOT NULL DEFAULT 2,
+    frecuencia_registro_min INTEGER NOT NULL DEFAULT 60,
     actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id)
 );
@@ -114,6 +115,8 @@ CREATE TABLE IF NOT EXISTS estado_modulo (
     servo_angulo INTEGER DEFAULT 0,
     pasos_motor_acumulados INTEGER DEFAULT 0,
     humedad_sustrato REAL,
+    ext_temp_ambiente REAL,
+    ext_humedad_ambiente REAL,
     actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (modulo_id) REFERENCES modulos_hidroponicos(id)
 );

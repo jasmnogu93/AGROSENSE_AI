@@ -2,3 +2,6 @@ PubSubClient
 DHT sensor library
 ESP32Servo
 Stepper
+Adafruit BME280 Library
+Adafruit BMP280 Library
+Adafruit Unified Sensor

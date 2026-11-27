@@ -18,8 +18,8 @@ Para permitir que cualquier evaluador docente o jurado de la Feria interactúe c
 2. **🏠 Mini Torre Domiciliaria (Proyecto Feria de Innovación):**
    * Muestra la tarjeta de **Recirculación Continua por Ciclo** (frecuencia en horas y duración de bombeo en minutos).
    * Muestra el estado del **Estanque (Nivel % con sensor resistivo)** y el bloqueo de seguridad anti-cavitación.
-   * Muestra los controles de **Actuadores Físicos**: Conmutación manual de Bomba 5V, ángulo de apertura del Servomotor SG90 (0°-90°) y pasos del Motor PaP dosificador 28BYJ-48.
-   * Muestra el DPV fisiológico y las decisiones del motor ciberfísico.
+   * Muestra telemetría en vivo **Interior (`BME/BMP280`) + Exterior (`DHT11`) + Presión (`hPa`) + DPV** y badge de conexión MQTT (`broker.emqx.io`), actualizándose automáticamente cada **5 segundos** vía `fetch('/api/v1/services/home-tower/status')` sin recargar la página ni perder la pestaña activa.
+   * Muestra los controles de **Actuadores Físicos**: Conmutación manual de Bomba 5V, ángulo del Servomotor SG90 (0°-90°) y pasos del Motor PaP dosificador 28BYJ-48 conectados al puente MQTT bidireccional.
 3. **🏢 Invernadero Industrial (Visión Escalable):**
    * Muestra un panel de múltiples celdas, comparativa de telemetría distribuida y estado del motor IA Jev.
 

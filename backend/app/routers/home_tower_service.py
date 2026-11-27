@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app import db
+from app.mqtt_bridge import mqtt_bridge
 
 router = APIRouter()
 
@@ -47,6 +48,8 @@ def get_home_tower_dashboard_data() -> Dict[str, Any]:
     """Lee el estado persistido de la Mini Torre Domiciliaria para el dashboard."""
     state = db.load_module_state(MODULE_ID)
     sched = db.load_schedule(MODULE_ID)
+    ext_temp = state.get("ext_temperature")
+    ext_hum = state.get("ext_humidity")
     return {
         "profile": HOME_TOWER_PROFILE,
         "state": {
@@ -64,7 +67,19 @@ def get_home_tower_dashboard_data() -> Dict[str, Any]:
             "recirculation_interval_hours": sched["interval_hours"],
             "recirculation_duration_minutes": sched["duration_minutes"],
             "last_cycle_timestamp": state["timestamp"],
+            "exterior_temperature_c": ext_temp,
+            "exterior_humidity_pct": ext_hum,
         },
+        "telemetry": {
+            "temperature_c": state["air_temperature"],
+            "humidity_pct": state["air_humidity"],
+            "pressure_hpa": state["barometric_pressure_hpa"],
+            "reservoir_level_pct": state["reservoir_level_percent"],
+            "dpv_kpa": state["vpd_kpa"],
+            "exterior_temperature_c": ext_temp,
+            "exterior_humidity_pct": ext_hum,
+        },
+        "mqtt": mqtt_bridge.get_status(),
     }
 
 
@@ -148,6 +163,8 @@ async def get_home_tower_status():
             "pressure_hpa": st["barometric_pressure_hpa"],
             "reservoir_level_pct": level,
             "dpv_kpa": st["dpv_kpa"],
+            "exterior_temperature_c": st.get("exterior_temperature_c"),
+            "exterior_humidity_pct": st.get("exterior_humidity_pct"),
         },
         "actuators": {
             "pump_active": st["pump_active"],
@@ -165,6 +182,7 @@ async def get_home_tower_status():
             "pump_allowed": not cavitacion_risk,
             "message": "BLOQUEO ANTI-CAVITACIÓN: Nivel crítico (<20%). Bomba protegida." if cavitacion_risk else "Nivel de solución óptimo.",
         },
+        "mqtt": mqtt_bridge.get_status(),
     }
 
 
@@ -197,6 +215,11 @@ async def execute_actuator_command(cmd: ActuatorCommandInput):
         triggered_by=cmd.triggered_by,
         enforce_cavitation_lock=True,
     )
+    mqtt_published = mqtt_bridge.publish_actuator_command(
+        target=cmd.target,
+        action=cmd.action,
+        parameter_value=cmd.parameter_value,
+    )
     return {
         "status": "success",
         "actuator": cmd.target,
@@ -206,6 +229,7 @@ async def execute_actuator_command(cmd: ActuatorCommandInput):
         "pump_active": new_state["pump_active"],
         "vent_servo_angle": new_state["vent_servo_angle"],
         "stepper_dosing_steps": new_state["stepper_dosing_steps"],
+        "mqtt_published": bool(mqtt_published),
         "message": f"Comando '{cmd.action}' ejecutado exitosamente en {cmd.target}.",
     }
 

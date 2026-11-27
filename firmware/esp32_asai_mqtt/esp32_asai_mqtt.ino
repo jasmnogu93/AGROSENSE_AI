@@ -27,9 +27,10 @@
 // ============================================================================
 // 1. CONFIGURACIÓN WI-FI Y MQTT (¡EDITA ESTAS 2 LÍNEAS!)
 // ============================================================================
-const char* ssid     = "TU_WIFI";       // <-- Nombre de tu Wi-Fi (debe ser 2.4 GHz)
-const char* password = "TU_PASSWORD";   // <-- Contraseña de tu Wi-Fi
+const char* ssid     = "TU_WIFI_2_4GHZ";     // <-- Nombre de tu Wi-Fi (debe ser 2.4 GHz)
+const char* password = "TU_PASSWORD_WIFI";   // <-- Contraseña de tu Wi-Fi
 
+// -- Aqui se configura el broker MQTT (broker.emqx.io), puerto 1883 y el ID unico del ESP32 --
 const char* mqtt_server    = "broker.emqx.io";
 const int   mqtt_port      = 1883;
 const char* mqtt_client_id = "ESP32_ASAI_01";
@@ -47,9 +48,10 @@ const int LEVEL_ADC_PIN = 34; // GPIO 34: entrada analógica ADC1 (0..4095)
 
 // Calibración del sensor de nivel (ajusta estos valores midiendo en Monitor Serial)
 // Con potenciómetro en Wokwi: 0 = seco (0%), 4095 = lleno (100%).
-// En sensor real de pistas: prueba fuera del agua (ADC_SECO) y sumergido (ADC_LLENO).
+// En sensor real de pistas (3.3V): seco = 0% (ADC_SECO = 0), ~80% sumergido dio ~17% (ADC ~700 -> ADC_LLENO = 850).
+// Si usas potenciómetro en Wokwi, cambia ADC_LLENO a 4095.
 const int ADC_SECO  = 0;
-const int ADC_LLENO = 4095;
+const int ADC_LLENO = 850;
 
 // Módulo Relé 1 Canal para Mini Bomba 5V (alimentado por Arduino Uno 5V)
 const int RELAY_PUMP_PIN = 26; // GPIO 26
@@ -72,15 +74,28 @@ const int STEPPER_IN3 = 5;
 const int STEPPER_IN4 = 13;
 const int PASOS_POR_VUELTA = 2048;
 
-// Presión barométrica por defecto (hPa) si no se conecta BME280 en GPIO 21/22.
-// Para usar BME280 real por I2C (SDA=21, SCL=22), instala "Adafruit BME280 Library"
-// y descomenta la línea #define USAR_BME280.
-// #define USAR_BME280
-#ifdef USAR_BME280
+// Sensor ambiental interior I2C en GPIO 21 (SDA) / GPIO 22 (SCL):
+// Habilitado por defecto con auto-detección de BME280 (Chip ID 0x60) o BMP280 (Chip ID 0x58)
+// en direcciones 0x76 y 0x77. Si no hay sensor conectado, hace fallback limpio a DHT11 y 1013.25 hPa.
+// Requiere instalar en Arduino IDE: "Adafruit BME280 Library" y "Adafruit BMP280 Library"
+// (junto con su dependencia "Adafruit Unified Sensor").
+#define USAR_SENSOR_I2C_INTERIOR
+#ifdef USAR_SENSOR_I2C_INTERIOR
   #include <Wire.h>
+  #include <Adafruit_Sensor.h>
   #include <Adafruit_BME280.h>
+  #include <Adafruit_BMP280.h>
+
+  enum TipoSensorI2C {
+    I2C_NINGUNO = 0,
+    I2C_BME280  = 1,
+    I2C_BMP280  = 2
+  };
+
   Adafruit_BME280 bme;
-  bool bmeDisponible = false;
+  Adafruit_BMP280 bmp;
+  TipoSensorI2C sensorInteriorTipo = I2C_NINGUNO;
+  uint8_t sensorInteriorAddr       = 0x00;
 #endif
 const float PRESION_DEFAULT_HPA = 1013.25;
 
@@ -90,7 +105,8 @@ const float UMBRAL_NIVEL_CRITICO = 20.0;
 // ============================================================================
 // 3. TÓPICOS MQTT OFICIALES (SINCRONIZADOS CON ASAIapp Y MQTTX)
 // ============================================================================
-// Publicación de telemetría (texto plano)
+// -- Aqui se declaran los topicos donde el ESP32 va a PUBLICAR los datos hacia Android y Web --
+// Publicación de telemetría Interior (texto plano)
 const char* TOPIC_TEMP      = "ASAI/Temperatura";
 const char* TOPIC_HUM       = "ASAI/Humedad";
 const char* TOPIC_NIVEL     = "ASAI/Nivel";
@@ -100,10 +116,15 @@ const char* TOPIC_BOMBA     = "ASAI/Bomba";
 const char* TOPIC_SERVO     = "ASAI/Servo";
 const char* TOPIC_ALERTA    = "ASAI/Alerta";
 
+// Publicación de telemetría Exterior (DHT11 en GPIO 4)
+const char* TOPIC_EXT_TEMP  = "ASAI/Exterior/Temperatura";
+const char* TOPIC_EXT_HUM   = "ASAI/Exterior/Humedad";
+
 // Compatibilidad con ejemplo base de la asignatura
 const char* TOPIC_CLASS_TEMP = "ESP8266/Temperatura";
 const char* TOPIC_CLASS_HUM  = "ESP8266/Humedad";
 
+// -- Aqui se declaran los topicos a los que el ESP32 se SUSCRIBE para recibir ordenes desde Android --
 // Suscripción de comandos desde ASAIapp / MQTTX
 const char* TOPIC_CMD_BOMBA      = "ASAI/Bomba/cmd";
 const char* TOPIC_CMD_SERVO      = "ASAI/Servo/cmd";
@@ -112,6 +133,7 @@ const char* TOPIC_CMD_NUTRIENTES = "ASAI/Nutrientes/cmd";
 // ============================================================================
 // 4. OBJETOS Y VARIABLES DE ESTADO GLOBAL
 // ============================================================================
+// -- Aqui se crea el cliente Wi-Fi y el cliente MQTT (PubSubClient) del ESP32 --
 WiFiClient espClient;
 PubSubClient client(espClient);
 DHT dht(DHTPIN, DHTTYPE);
@@ -121,11 +143,14 @@ Stepper motorNutrientes(PASOS_POR_VUELTA, STEPPER_IN1, STEPPER_IN3, STEPPER_IN2,
 unsigned long ultimoEnvioMs = 0;
 const unsigned long INTERVALO_PUBLICACION_MS = 5000; // Publicar cada 5 segundos sin bloquear
 
-bool bombaEncendida    = false;
-int  anguloServoActual = 0;
-float ultimoNivelPct   = 100.0;
-float ultimaTempC      = 22.0;
-float ultimaHumPct     = 60.0;
+bool bombaEncendida      = false;
+int  anguloServoActual   = 0;
+float ultimoNivelPct     = 100.0;
+float ultimaExtTempC     = 22.0;
+float ultimaExtHumPct    = 60.0;
+float ultimaIntTempC     = 22.0;
+float ultimaIntHumPct    = 60.0;
+float ultimaPresionHpa   = PRESION_DEFAULT_HPA;
 
 // ============================================================================
 // 5. FUNCIONES AUXILIARES DE HARDWARE Y SEGURIDAD
@@ -149,6 +174,12 @@ float leerNivelEstanque() {
   if (porcentaje < 0.0)   porcentaje = 0.0;
   if (porcentaje > 100.0) porcentaje = 100.0;
 
+  Serial.print("[NIVEL] ADC crudo=");
+  Serial.print(adcBruto);
+  Serial.print(" -> ");
+  Serial.print(porcentaje, 1);
+  Serial.println("%");
+
   return porcentaje;
 }
 
@@ -166,6 +197,7 @@ float calcularDPV(float tempC, float humPct) {
  * Control seguro de la bomba con protección local anti-cavitación.
  * Si el estanque está bajo 20%, corta el relé en hardware y publica alerta.
  */
+// -- Aqui el ESP32 protege la bomba (< 20%) y PUBLICA su estado y alerta hacia Android --
 void aplicarBombaSegura(bool solicitarEncendido, float nivelActual) {
   if (nivelActual < UMBRAL_NIVEL_CRITICO) {
     digitalWrite(RELAY_PUMP_PIN, RELAY_OFF);
@@ -200,6 +232,79 @@ void apagarBobinasStepper() {
   digitalWrite(STEPPER_IN4, LOW);
 }
 
+#ifdef USAR_SENSOR_I2C_INTERIOR
+/*
+ * Lee el registro 0xD0 (Chip ID) en la dirección I2C indicada.
+ * Retorna 0x60 para BME280, 0x58 para BMP280, o 0x00 si no responde.
+ */
+uint8_t leerChipIdI2C(uint8_t addr) {
+  Wire.beginTransmission(addr);
+  Wire.write(0xD0);
+  if (Wire.endTransmission(true) != 0) {
+    return 0x00;
+  }
+  if (Wire.requestFrom((int)addr, 1) != 1) {
+    return 0x00;
+  }
+  return Wire.read();
+}
+
+/*
+ * Auto-detecta BME280 (0x60) o BMP280 (0x58) en direcciones 0x76 y 0x77
+ * sobre bus I2C GPIO 21 (SDA) / GPIO 22 (SCL) sin bloquear si no hay sensor.
+ */
+void inicializarSensorI2CInterior() {
+  Wire.begin(21, 22);
+  sensorInteriorTipo = I2C_NINGUNO;
+  sensorInteriorAddr = 0x00;
+
+  const uint8_t direcciones[2] = {0x76, 0x77};
+  for (int i = 0; i < 2; i++) {
+    uint8_t addr = direcciones[i];
+    uint8_t chipId = leerChipIdI2C(addr);
+
+    if (chipId == 0x60) {
+      if (bme.begin(addr, &Wire)) {
+        sensorInteriorTipo = I2C_BME280;
+        sensorInteriorAddr = addr;
+        Serial.print("[I2C] BME280 detectado en 0x");
+        Serial.print(addr, HEX);
+        Serial.println(" (Chip ID 0x60). Temp + Humedad + Presion interiores reales.");
+        return;
+      }
+    } else if (chipId == 0x58 || chipId == 0x56 || chipId == 0x57) {
+      if (bmp.begin(addr)) {
+        sensorInteriorTipo = I2C_BMP280;
+        sensorInteriorAddr = addr;
+        Serial.print("[I2C] BMP280 detectado en 0x");
+        Serial.print(addr, HEX);
+        Serial.println(" (Chip ID 0x58). Temp + Presion reales; humedad interior usa respaldo DHT11.");
+        return;
+      }
+    } else if (chipId != 0x00) {
+      // Intento de respaldo si respondió otro ID en 0x76/0x77
+      if (bme.begin(addr, &Wire)) {
+        sensorInteriorTipo = I2C_BME280;
+        sensorInteriorAddr = addr;
+        Serial.print("[I2C] BME280 detectado (respaldo) en 0x");
+        Serial.println(addr, HEX);
+        return;
+      }
+      if (bmp.begin(addr)) {
+        sensorInteriorTipo = I2C_BMP280;
+        sensorInteriorAddr = addr;
+        Serial.print("[I2C] BMP280 detectado (respaldo) en 0x");
+        Serial.print(addr, HEX);
+        Serial.println(". Humedad interior usa respaldo DHT11.");
+        return;
+      }
+    }
+  }
+
+  Serial.println("[I2C] No se detecto BME280/BMP280 en 0x76 ni 0x77. Fallback a DHT11 y 1013.25 hPa.");
+}
+#endif
+
 // ============================================================================
 // 6. CONEXIÓN WI-FI Y MQTT (ESTRUCTURA DOCENTE OFICIAL)
 // ============================================================================
@@ -224,6 +329,7 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
+// -- Aqui el ESP32 RECIBE y procesa las ordenes que llegan desde Android o MQTTX --
 void callback(char* topic, byte* payload, unsigned int length) {
   String topico = String(topic);
   String mensaje = "";
@@ -289,6 +395,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
+// -- Aqui el ESP32 se conecta al broker MQTT y se SUSCRIBE a los topicos de comandos --
 void reconnect() {
   while (!client.connected()) {
     // Seguridad primero: nunca dejar la bomba corriendo si cae el nivel durante reconexión
@@ -306,6 +413,7 @@ void reconnect() {
     if (client.connect(mqtt_client_id)) {
       Serial.println("CONECTADO.");
 
+      // -- Aqui se crean las suscripciones del ESP32 para escuchar comandos desde Android --
       // Suscribirse a los 3 tópicos de comando de ASAIapp / MQTTX
       client.subscribe(TOPIC_CMD_BOMBA);
       client.subscribe(TOPIC_CMD_SERVO);
@@ -352,23 +460,17 @@ void setup() {
   servoVent.attach(SERVO_VENT_PIN, 500, 2400);
   servoVent.write(anguloServoActual);
 
-  // Iniciar sensor DHT
+  // Iniciar sensor DHT11 (Exterior)
   dht.begin();
 
-  // Iniciar BME280 solo si está habilitado (no bloquea si no está conectado)
-#ifdef USAR_BME280
-  Wire.begin(21, 22);
-  if (bme.begin(0x76) || bme.begin(0x77)) {
-    bmeDisponible = true;
-    Serial.println("[I2C] BME280 detectado en GPIO 21/22.");
-  } else {
-    bmeDisponible = false;
-    Serial.println("[I2C] BME280 no detectado. Usando 1013.25 hPa por defecto.");
-  }
+  // Auto-detectar sensor I2C Interior (BME280 o BMP280 en GPIO 21/22, sin bloquear)
+#ifdef USAR_SENSOR_I2C_INTERIOR
+  inicializarSensorI2CInterior();
 #else
-  Serial.println("[I2C] Presión por defecto habilitada (1013.25 hPa).");
+  Serial.println("[I2C] Sensor I2C interior deshabilitado. Fallback a DHT11 y 1013.25 hPa.");
 #endif
 
+  // -- Aqui se enlaza el servidor MQTT y se registra la funcion callback() que escuchara los mensajes --
   // Conectar Wi-Fi y configurar cliente MQTT
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
@@ -382,31 +484,79 @@ void loop() {
   if (!client.connected()) {
     reconnect();
   }
+  // -- Aqui client.loop() mantiene abierta la escucha de mensajes entrantes desde Android --
   client.loop();
 
+  // -- Aqui el temporizador no bloqueante (millis) dispara la lectura y publicacion cada 5 segundos --
   unsigned long ahoraMs = millis();
   if (ahoraMs - ultimoEnvioMs >= INTERVALO_PUBLICACION_MS) {
     ultimoEnvioMs = ahoraMs;
 
-    // 1. Leer sensores ambientales (DHT)
-    float t = dht.readTemperature();
-    float h = dht.readHumidity();
-    if (isnan(t) || isnan(h)) {
-      Serial.println("[ADVERTENCIA] Error leyendo DHT en GPIO 4. Usando última lectura válida.");
-      t = ultimaTempC;
-      h = ultimaHumPct;
+    // 1. Leer sensor Exterior (DHT11 en GPIO 4) con respaldo a última lectura válida
+    float tExtRaw = dht.readTemperature();
+    float hExtRaw = dht.readHumidity();
+    if (isnan(tExtRaw) || isnan(hExtRaw)) {
+      Serial.println("[ADVERTENCIA] Error leyendo DHT11 (Exterior) en GPIO 4. Usando ultima lectura valida.");
     } else {
-      ultimaTempC  = t;
-      ultimaHumPct = h;
+      ultimaExtTempC  = tExtRaw;
+      ultimaExtHumPct = hExtRaw;
     }
+    float extTemp = ultimaExtTempC;
+    float extHum  = ultimaExtHumPct;
 
-    // 2. Leer presión barométrica (BME280 si está activo o 1013.25 hPa por defecto)
+    // 2. Leer sensor Interior (BME280 / BMP280 en GPIO 21/22 o fallback limpio a DHT11)
+    float intTemp = extTemp;
+    float intHum  = extHum;
     float presionHpa = PRESION_DEFAULT_HPA;
-#ifdef USAR_BME280
-    if (bmeDisponible) {
-      float p = bme.readPressure() / 100.0F;
-      if (!isnan(p) && p > 300.0 && p < 1200.0) {
-        presionHpa = p;
+    bool humedadInteriorRespaldoDHT = true;
+
+#ifdef USAR_SENSOR_I2C_INTERIOR
+    if (sensorInteriorTipo == I2C_BME280) {
+      float tInt = bme.readTemperature();
+      float hInt = bme.readHumidity();
+      float pInt = bme.readPressure() / 100.0F;
+
+      if (!isnan(tInt) && tInt > -40.0 && tInt < 85.0) {
+        ultimaIntTempC = tInt;
+        intTemp = tInt;
+      } else {
+        Serial.println("[ADVERTENCIA] Lectura invalida de temperatura BME280; usando respaldo DHT11.");
+      }
+
+      if (!isnan(hInt) && hInt >= 0.0 && hInt <= 100.0) {
+        ultimaIntHumPct = hInt;
+        intHum = hInt;
+        humedadInteriorRespaldoDHT = false;
+      } else {
+        Serial.println("[ADVERTENCIA] Lectura invalida de humedad BME280; usando respaldo DHT11.");
+      }
+
+      if (!isnan(pInt) && pInt > 300.0 && pInt < 1200.0) {
+        ultimaPresionHpa = pInt;
+        presionHpa = pInt;
+      } else {
+        presionHpa = ultimaPresionHpa;
+      }
+    } else if (sensorInteriorTipo == I2C_BMP280) {
+      float tInt = bmp.readTemperature();
+      float pInt = bmp.readPressure() / 100.0F;
+
+      if (!isnan(tInt) && tInt > -40.0 && tInt < 85.0) {
+        ultimaIntTempC = tInt;
+        intTemp = tInt;
+      } else {
+        Serial.println("[ADVERTENCIA] Lectura invalida de temperatura BMP280; usando respaldo DHT11.");
+      }
+
+      // BMP280 no posee higrómetro: la humedad interior y el DPV usan respaldo DHT11
+      intHum = extHum;
+      humedadInteriorRespaldoDHT = true;
+
+      if (!isnan(pInt) && pInt > 300.0 && pInt < 1200.0) {
+        ultimaPresionHpa = pInt;
+        presionHpa = pInt;
+      } else {
+        presionHpa = ultimaPresionHpa;
       }
     }
 #endif
@@ -417,39 +567,79 @@ void loop() {
     // 4. Evaluar fail-safe anti-cavitación en cada ciclo
     aplicarBombaSegura(bombaEncendida, ultimoNivelPct);
 
-    // 5. Calcular DPV (kPa)
-    float dpv = calcularDPV(ultimaTempC, ultimaHumPct);
+    // 5. Calcular DPV (kPa) usando temperatura y humedad INTERIOR
+    float dpv = calcularDPV(intTemp, intHum);
 
     // 6. Convertir a texto plano y publicar en todos los tópicos oficiales
-    String strTemp    = String(ultimaTempC, 2);
-    String strHum     = String(ultimaHumPct, 2);
+    String strExtTemp = String(extTemp, 2);
+    String strExtHum  = String(extHum, 2);
+    String strIntTemp = String(intTemp, 2);
+    String strIntHum  = String(intHum, 2);
     String strNivel   = String(ultimoNivelPct, 2);
     String strDpv     = String(dpv, 2);
     String strPresion = String(presionHpa, 2);
     const char* strBomba  = bombaEncendida ? "ON" : "OFF";
     const char* strAlerta = (ultimoNivelPct < UMBRAL_NIVEL_CRITICO) ? "ESTANQUE_BAJO" : "NORMAL";
 
-    client.publish(TOPIC_TEMP, strTemp.c_str());
-    client.publish(TOPIC_HUM, strHum.c_str());
-    client.publish(TOPIC_NIVEL, strNivel.c_str());
-    client.publish(TOPIC_DPV, strDpv.c_str());
+    // -- Aqui el ESP32 PUBLICA todos los datos de los sensores cada 5 segundos hacia Android y Web --
+    // Telemetría Interior (ASAI/Temperatura, ASAI/Humedad, ASAI/Presion, ASAI/DPV)
+    client.publish(TOPIC_TEMP, strIntTemp.c_str());
+    client.publish(TOPIC_HUM, strIntHum.c_str());
     client.publish(TOPIC_PRESION, strPresion.c_str());
+    client.publish(TOPIC_DPV, strDpv.c_str());
+
+    // Telemetría Exterior (DHT11)
+    client.publish(TOPIC_EXT_TEMP, strExtTemp.c_str());
+    client.publish(TOPIC_EXT_HUM, strExtHum.c_str());
+
+    // Estanque, actuadores y alerta
+    client.publish(TOPIC_NIVEL, strNivel.c_str());
     client.publish(TOPIC_BOMBA, strBomba);
     client.publish(TOPIC_ALERTA, strAlerta);
 
     // Compatibilidad con ejemplo de clase (DHT11 + MQTT.pdf)
-    client.publish(TOPIC_CLASS_TEMP, strTemp.c_str());
-    client.publish(TOPIC_CLASS_HUM, strHum.c_str());
+    client.publish(TOPIC_CLASS_TEMP, strExtTemp.c_str());
+    client.publish(TOPIC_CLASS_HUM, strExtHum.c_str());
 
     // 7. Evidencia en Monitor Serial (115200 baudios)
     Serial.println("--------------------------------------------------");
-    Serial.print("Temp: ");    Serial.print(strTemp);    Serial.print(" C | ");
-    Serial.print("Hum: ");     Serial.print(strHum);     Serial.print(" % | ");
-    Serial.print("DPV: ");     Serial.print(strDpv);     Serial.println(" kPa");
-    Serial.print("Nivel: ");   Serial.print(strNivel);   Serial.print(" % | ");
-    Serial.print("Presion: "); Serial.print(strPresion); Serial.println(" hPa");
-    Serial.print("Bomba: ");   Serial.print(strBomba);   Serial.print(" | ");
-    Serial.print("Servo: ");   Serial.print(anguloServoActual); Serial.print(" deg | ");
-    Serial.print("Alerta: ");  Serial.println(strAlerta);
+    Serial.print("[EXTERIOR - DHT11 GPIO 4] Temp: ");
+    Serial.print(strExtTemp); Serial.print(" C | Hum: ");
+    Serial.print(strExtHum);  Serial.println(" %");
+
+    Serial.print("[INTERIOR - ");
+#ifdef USAR_SENSOR_I2C_INTERIOR
+    if (sensorInteriorTipo == I2C_BME280) {
+      Serial.print("BME280 0x");
+      Serial.print(sensorInteriorAddr, HEX);
+    } else if (sensorInteriorTipo == I2C_BMP280) {
+      Serial.print("BMP280 0x");
+      Serial.print(sensorInteriorAddr, HEX);
+      Serial.print(" | Humedad interior usa respaldo DHT11");
+    } else {
+      Serial.print("Fallback DHT11 (sin I2C)");
+    }
+#else
+    Serial.print("Fallback DHT11");
+#endif
+    Serial.print("] Temp: ");   Serial.print(strIntTemp);
+    Serial.print(" C | Hum: "); Serial.print(strIntHum);
+#ifdef USAR_SENSOR_I2C_INTERIOR
+    if (humedadInteriorRespaldoDHT && sensorInteriorTipo == I2C_BMP280) {
+      Serial.print(" % (DHT11)");
+    } else {
+      Serial.print(" %");
+    }
+#else
+    Serial.print(" %");
+#endif
+    Serial.print(" | Presion: "); Serial.print(strPresion);
+    Serial.print(" hPa | DPV: "); Serial.print(strDpv);
+    Serial.println(" kPa");
+
+    Serial.print("[SISTEMA] Nivel: "); Serial.print(strNivel);   Serial.print(" % | ");
+    Serial.print("Bomba: ");           Serial.print(strBomba);   Serial.print(" | ");
+    Serial.print("Servo: ");           Serial.print(anguloServoActual); Serial.print(" deg | ");
+    Serial.print("Alerta: ");          Serial.println(strAlerta);
   }
 }

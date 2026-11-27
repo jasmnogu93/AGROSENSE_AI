@@ -40,8 +40,9 @@ La pantalla principal (`activity_main.xml`) suscribe `ASAIapp` a los mismos indi
 
 | Tarjeta / Métrica | ID Sugerido (`TextView`) | Tópico MQTT Suscrito | Formato / Unidad | Regla Visual |
 | :--- | :--- | :--- | :--- | :--- |
-| **Temperatura Ambiental** | `txtTemperature` | `ASAI/Temperatura` | `"Temperatura:\n22.40 °C"` | Color `#FF5722` |
-| **Humedad Relativa** | `txtHumidity` | `ASAI/Humedad` | `"Humedad:\n60.50 %"` | Color `#03A9F4` |
+| **Temperatura Interior** | `txtTemperature` | `ASAI/Temperatura` | `"Temp. Interior:\n23.80 °C"` | Color `#FF5722` |
+| **Humedad Interior** | `txtHumidity` | `ASAI/Humedad` | `"Hum. Interior:\n68.50 %"` | Color `#03A9F4` |
+| **Clima Exterior (`DHT11`)** | `txtExteriorEnv` | `ASAI/Exterior/Temperatura` y `ASAI/Exterior/Humedad` | `"Exterior (DHT11):\n21.40 °C | 55.00 %"` | Tarjeta `CardView` comparativa en tiempo real |
 | **Nivel de Estanque** | `txtWaterLevel` | `ASAI/Nivel` | `"Nivel Estanque:\n82.00 %"` | Semáforo: Verde `#4CAF50` (`>= 20%`) / Rojo `#F30606` (`< 20%`) |
 | **DPV y Presión** | `txtVpd` / `txtPressure` | `ASAI/DPV` y `ASAI/Presion` | `"DPV: 1.05 kPa"` / `"1014.20 hPa"` | Indicador de transpiración saludable |
 | **Estado de Bomba / Alerta**| `txtPumpStatus` | `ASAI/Bomba` y `ASAI/Alerta` | `"Bomba: ON/OFF"` | Muestra aviso si ocurre `ESTANQUE_BAJO` |
